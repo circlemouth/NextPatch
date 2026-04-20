@@ -1,0 +1,14 @@
+.DS_Store
+node_modules
+.next
+*.tsbuildinfo
+out
+coverage
+playwright-report
+test-results
+.env
+.env.local
+.env.*.local
+exports
+supabase/.branches
+supabase/.temp
