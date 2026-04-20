@@ -33,7 +33,7 @@ create table repository_versions (
   id uuid primary key default gen_random_uuid(),
   workspace_id uuid not null references workspaces(id) on delete cascade,
   user_id uuid not null references auth.users(id) on delete cascade,
-  repository_id uuid,
+  repository_id uuid not null,
   name text not null,
   description text,
   target_date date,
@@ -287,7 +287,7 @@ create policy workspaces_owner_insert on workspaces for insert with check (owner
 create policy workspaces_member_update on workspaces for update using (is_workspace_member(id)) with check (is_workspace_member(id));
 
 create policy workspace_members_select on workspace_members for select using (user_id = auth.uid() or is_workspace_member(workspace_id));
-create policy workspace_members_insert on workspace_members for insert with check (user_id = auth.uid() or is_workspace_member(workspace_id));
+create policy workspace_members_insert on workspace_members for insert with check (user_id = auth.uid());
 create policy workspace_members_update on workspace_members for update using (is_workspace_member(workspace_id)) with check (is_workspace_member(workspace_id));
 
 create policy repositories_member_all on repositories for all using (is_workspace_member(workspace_id)) with check (is_workspace_member(workspace_id));
