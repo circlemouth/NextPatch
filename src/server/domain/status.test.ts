@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { applyStatusTimestamps, isClosed, isCompleted } from "./status";
+import { applyStatusTimestamps, isClosed, isCompleted, isOnHold, isOpen } from "./status";
 
 describe("status lifecycle", () => {
   it("separates completed and closed", () => {
@@ -30,5 +30,25 @@ describe("status lifecycle", () => {
     );
     expect(result.completed_at).toBeNull();
     expect(result.closed_at).toBeNull();
+  });
+
+  it("marks hold states and non-closed items correctly", () => {
+    expect(isOnHold("blocked")).toBe(true);
+    expect(
+      isOpen({
+        type: "idea",
+        status: "in_review",
+        archived_at: null,
+        deleted_at: null
+      })
+    ).toBe(true);
+    expect(
+      isOpen({
+        type: "bug",
+        status: "resolved",
+        archived_at: null,
+        deleted_at: null
+      })
+    ).toBe(false);
   });
 });
