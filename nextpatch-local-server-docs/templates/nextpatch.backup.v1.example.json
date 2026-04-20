@@ -1,0 +1,40 @@
+{
+  "format": "nextpatch.backup",
+  "schemaVersion": 1,
+  "exportedAt": "2026-04-20T00:00:00.000Z",
+  "app": {
+    "name": "NextPatch",
+    "version": "0.1.0"
+  },
+  "scope": {
+    "type": "workspace",
+    "workspaceId": "00000000-0000-0000-0000-000000000000",
+    "repositoryIds": []
+  },
+  "options": {
+    "includeArchived": true,
+    "includeDeleted": true,
+    "includeAuditLogs": false,
+    "includeAttachments": false,
+    "redaction": "none"
+  },
+  "entities": {
+    "workspaces": [],
+    "workspaceMembers": [],
+    "repositories": [],
+    "workItems": [],
+    "bugDetails": [],
+    "ideas": [],
+    "techNotes": [],
+    "referenceServices": [],
+    "tags": [],
+    "workItemTags": [],
+    "statusHistories": [],
+    "repositoryVersions": [],
+    "classificationCandidates": []
+  },
+  "integrity": {
+    "counts": {},
+    "contentHash": "sha256:"
+  }
+}
