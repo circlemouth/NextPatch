@@ -7,6 +7,8 @@
   --color-border-soft: #cbd5e1;
   --color-primary: #1d4ed8;
   --color-primary-hover: #1e40af;
+  --color-link-visited: #6d28d9;
+  --color-focus: #1d4ed8;
   --color-success: #166534;
   --color-success-bg: #f0fdf4;
   --color-error: #b91c1c;
@@ -24,5 +26,6 @@
   --radius-lg: 12px;
   --font-sans: Arial, "Hiragino Kaku Gothic ProN", "Yu Gothic", Meiryo, sans-serif;
   --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
-  --layout-sidebar: 248px;
+  --layout-sidebar: 264px;
+  --layout-page-max: 1180px;
 }
