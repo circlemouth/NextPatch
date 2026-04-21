@@ -3,10 +3,20 @@ services:
     build:
       context: .
     env_file:
-      - .env
+      - path: .env
+        required: false
     environment:
       NODE_ENV: production
       PORT: 3000
+      NEXTPATCH_RUNTIME_MODE: local-server
+      NEXTPATCH_DATA_DIR: /app/data
+      NEXTPATCH_DB_PATH: /app/data/nextpatch.sqlite
+      NEXTPATCH_EXPORT_DIR: /app/data/exports
     ports:
       - "3000:3000"
+    volumes:
+      - nextpatch_data:/app/data
     restart: unless-stopped
+
+volumes:
+  nextpatch_data:
