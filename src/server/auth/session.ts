@@ -54,16 +54,6 @@ export async function getAuthenticatedLocalContext(): Promise<LocalContext | nul
   return getAuthenticatedLocalContextFromToken(token, config.sessionSecret);
 }
 
-export async function getAuthenticatedLocalContextFromCookieHeader(cookieHeader: string | null | undefined): Promise<LocalContext | null> {
-  const config = getAuthConfig();
-  if (!config) {
-    return null;
-  }
-
-  const token = readCookieValue(cookieHeader, SESSION_COOKIE_NAME);
-  return getAuthenticatedLocalContextFromToken(token, config.sessionSecret);
-}
-
 export async function requireLocalContext(): Promise<LocalContext> {
   const context = await getAuthenticatedLocalContext();
   if (!context) {
@@ -93,19 +83,4 @@ async function getAuthenticatedLocalContextFromToken(token: string | undefined, 
   }
 
   return LOCAL_CONTEXT;
-}
-
-function readCookieValue(cookieHeader: string | null | undefined, name: string) {
-  if (!cookieHeader) {
-    return undefined;
-  }
-
-  for (const entry of cookieHeader.split(";")) {
-    const [rawName, ...rawValue] = entry.split("=");
-    if (rawName?.trim() === name) {
-      return rawValue.join("=").trim();
-    }
-  }
-
-  return undefined;
 }

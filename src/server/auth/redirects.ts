@@ -4,11 +4,7 @@ export function sanitizeNextPath(input: string | null | undefined): string {
   }
 
   const trimmed = input.trim();
-  if (!trimmed || trimmed.startsWith("//") || /^[a-zA-Z][a-zA-Z\d+\-.]*:/.test(trimmed)) {
-    return "/dashboard";
-  }
-
-  if (!trimmed.startsWith("/")) {
+  if (isUnsafeNextPath(trimmed)) {
     return "/dashboard";
   }
 
@@ -17,10 +13,20 @@ export function sanitizeNextPath(input: string | null | undefined): string {
     if (parsed.origin !== "http://nextpatch.local" || !parsed.pathname.startsWith("/")) {
       return "/dashboard";
     }
-    return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+
+    const safePath = `${parsed.pathname}${parsed.search}${parsed.hash}`;
+    if (isUnsafeNextPath(safePath)) {
+      return "/dashboard";
+    }
+
+    return safePath;
   } catch {
     return "/dashboard";
   }
+}
+
+function isUnsafeNextPath(value: string): boolean {
+  return !value || value.startsWith("//") || /^[a-zA-Z][a-zA-Z\d+\-.]*:/.test(value) || !value.startsWith("/");
 }
 
 export function isPublicPath(pathname: string): boolean {

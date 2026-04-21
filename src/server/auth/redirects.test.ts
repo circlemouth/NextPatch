@@ -6,6 +6,11 @@ describe("sanitizeNextPath", () => {
     expect(sanitizeNextPath("/dashboard?tab=summary")).toBe("/dashboard?tab=summary");
   });
 
+  it("rejects normalized protocol-relative paths", () => {
+    expect(sanitizeNextPath("/..//evil.example")).toBe("/dashboard");
+    expect(sanitizeNextPath("/%2e%2e//evil.example")).toBe("/dashboard");
+  });
+
   it("rejects external URLs", () => {
     expect(sanitizeNextPath("https://evil.example")).toBe("/dashboard");
   });

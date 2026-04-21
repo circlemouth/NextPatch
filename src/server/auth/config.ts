@@ -12,7 +12,7 @@ export function getAuthConfig(): AuthConfig | null {
   const loginPassword = process.env.NEXTPATCH_LOGIN_PASSWORD;
   const sessionSecret = process.env.NEXTPATCH_SESSION_SECRET;
 
-  if (!loginPassword || !sessionSecret) {
+  if (!loginPassword?.trim() || !sessionSecret?.trim()) {
     return null;
   }
 

@@ -7,11 +7,20 @@ const originalSessionMaxAgeSeconds = process.env.NEXTPATCH_SESSION_MAX_AGE_SECON
 const originalCookieSecure = process.env.NEXTPATCH_COOKIE_SECURE;
 
 afterEach(() => {
-  process.env.NEXTPATCH_LOGIN_PASSWORD = originalLoginPassword;
-  process.env.NEXTPATCH_SESSION_SECRET = originalSessionSecret;
-  process.env.NEXTPATCH_SESSION_MAX_AGE_SECONDS = originalSessionMaxAgeSeconds;
-  process.env.NEXTPATCH_COOKIE_SECURE = originalCookieSecure;
+  restoreEnv("NEXTPATCH_LOGIN_PASSWORD", originalLoginPassword);
+  restoreEnv("NEXTPATCH_SESSION_SECRET", originalSessionSecret);
+  restoreEnv("NEXTPATCH_SESSION_MAX_AGE_SECONDS", originalSessionMaxAgeSeconds);
+  restoreEnv("NEXTPATCH_COOKIE_SECURE", originalCookieSecure);
 });
+
+function restoreEnv(name: string, value: string | undefined) {
+  if (value === undefined) {
+    delete process.env[name];
+    return;
+  }
+
+  process.env[name] = value;
+}
 
 describe("getAuthConfig", () => {
   it("detects missing auth configuration", () => {
@@ -20,6 +29,16 @@ describe("getAuthConfig", () => {
     expect(getAuthConfig()).toBeNull();
 
     process.env.NEXTPATCH_LOGIN_PASSWORD = "password";
+    expect(getAuthConfig()).toBeNull();
+  });
+
+  it("treats whitespace-only auth configuration as missing", () => {
+    process.env.NEXTPATCH_LOGIN_PASSWORD = "   ";
+    process.env.NEXTPATCH_SESSION_SECRET = "secret";
+    expect(getAuthConfig()).toBeNull();
+
+    process.env.NEXTPATCH_LOGIN_PASSWORD = "password";
+    process.env.NEXTPATCH_SESSION_SECRET = "\t\n";
     expect(getAuthConfig()).toBeNull();
   });
 

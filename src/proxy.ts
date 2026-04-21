@@ -1,10 +1,10 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { getAuthenticatedLocalContextFromCookieHeader } from "@/server/auth/session";
+import { hasAuthenticatedLocalSession } from "@/server/auth/proxy-session";
 import { getLoginPath, isProtectedPath, isPublicPath, sanitizeNextPath } from "@/server/auth/redirects";
 
 export async function proxy(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
-  const authenticated = await getAuthenticatedLocalContextFromCookieHeader(request.headers.get("cookie"));
+  const authenticated = await hasAuthenticatedLocalSession(request.headers.get("cookie"));
 
   if (pathname === "/login") {
     if (authenticated) {
@@ -22,6 +22,7 @@ export async function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
+  // MVP policy: all API routes are private. Revisit this before adding public API endpoints.
   if (pathname.startsWith("/api/")) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

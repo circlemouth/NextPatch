@@ -61,6 +61,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
             </p>
             <input
               aria-describedby={describedBy || undefined}
+              aria-invalid={Boolean(errorMessage)}
               autoComplete="current-password"
               id="password"
               name="password"
