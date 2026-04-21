@@ -78,7 +78,7 @@ For a clean local restart, stop the app, remove the SQLite database with `pnpm d
 
 ## Login Route
 
-`/login` is kept only as a bookmark-safe redirect to `/dashboard`. It is not a login feature, and the app does not include a login form, magic link flow, or auth callback in the SQLite local MVP.
+`/login` is kept only as a bookmark-safe redirect to `/dashboard`. It is not a login feature, and the SQLite local MVP does not include email sign-in or an auth callback.
 
 ## External Exposure
 
