@@ -1,14 +1,14 @@
 # NextPatch
 
-NextPatch is a self-managed local server web app for organizing repository work, bugs, ideas, implementation notes, ChatGPT paste notes, and the next action to take.
+NextPatch は、リポジトリ作業、バグ、アイデア、実装メモ、ChatGPT の貼り付けメモ、次に取るべきアクションを整理するための、自己管理型のローカルサーバー Web アプリです。
 
-The MVP is a local single-user build with a simple password login. It still binds to localhost by default and should not be exposed on a LAN or the public internet without an external protection layer. GitHub integration is limited to URL parsing, and ChatGPT integration is limited to manual paste plus local JSON/Markdown parsing.
+MVP はローカル単一ユーザー向け実装です。信頼できる LAN 内で利用するための共通パスワードログインと署名付き HttpOnly Cookie セッションを備えていますが、インターネット公開、SSO、多人数管理、パスワードリセット、HTTPS 終端は対象外です。GitHub 連携は URL 解析に限定され、ChatGPT 連携は手動貼り付けとローカルの JSON / Markdown 解析に限定されます。
 
 ## Requirements
 
 - Node.js 22
 - pnpm 10
-- Docker Desktop or Docker Engine
+- Docker Desktop または Docker Engine
 
 ## Development Startup
 
@@ -20,20 +20,31 @@ pnpm db:seed
 pnpm dev
 ```
 
-Open `http://localhost:3000`. The app uses a local single-user context during the SQLite migration.
-Set `NEXTPATCH_LOGIN_PASSWORD` and `NEXTPATCH_SESSION_SECRET` before using the login form.
-If you need a clean local database, run `pnpm db:reset:dev` first. It removes only the SQLite file plus `-wal` and `-shm` sidecars and respects `NEXTPATCH_DB_PATH` when set.
+`.env.local` に `NEXTPATCH_LOGIN_PASSWORD` と `NEXTPATCH_SESSION_SECRET` を設定してから `http://localhost:3000/login` を開いてください。
+セッションシークレットは次のコマンドで生成できます。
+
+```bash
+node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"
+```
+
+LAN から開発サーバーにアクセスする確認が必要な場合は、`pnpm dev:lan` を使い、別端末から `http://<ホスト端末のLAN IP>:3000/login` を開きます。
+ローカル DB を初期化したい場合は、先に `pnpm db:reset:dev` を実行してください。SQLite ファイル本体と `-wal` / `-shm` の付随ファイルだけを削除し、`NEXTPATCH_DB_PATH` が設定されていればそれを尊重します。
 
 ## Daily Local Server Startup
 
 ```bash
 cp .env.example .env
-docker compose up -d
+node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"
+docker compose up -d --build
 ```
 
-The compose file starts the NextPatch web container, runs database init on container start, and mounts the SQLite data volume at `/app/data`.
-It binds only to `127.0.0.1:3000` so the service stays on the local machine by default.
-Use this path when you want the app running as a persistent local server.
+`.env` で `NEXTPATCH_LOGIN_PASSWORD` を利用者が決めた共通パスワードに設定し、生成した値を `NEXTPATCH_SESSION_SECRET` に設定してください。実パスワードや実シークレットは `.env.example` や Git 管理ファイルに書かないでください。
+
+この compose ファイルは NextPatch の Web コンテナを起動し、コンテナ起動時に DB 初期化を実行し、SQLite データボリュームを `/app/data` にマウントします。既定では `0.0.0.0:3000` にバインドし、信頼できる LAN 内の別端末から `http://<ホスト端末のLAN IP>:3000/login` でログイン画面を開けます。
+
+ホスト OS のファイアウォールで `3000/tcp` の受信許可が必要な場合があります。ポートや bind address を変える場合は、`.env` の `NEXTPATCH_BIND_HOST` と `NEXTPATCH_HOST_PORT` を変更してください。
+
+HTTPS が必要な場合は、別途リバースプロキシで HTTPS を終端し、`NEXTPATCH_COOKIE_SECURE=true` を設定してください。
 
 ## Stop
 
@@ -41,48 +52,49 @@ Use this path when you want the app running as a persistent local server.
 docker compose down
 ```
 
-Use `docker compose down` to stop the daily local server stack.
+日常利用のローカルサーバースタックを停止するには `docker compose down` を使います。
 
 ## Schema and Migrations
 
-The SQLite migration source of truth is the hand-written SQL under `drizzle/*.sql`.
-Those files define the authoritative tables, constraints, and indexes, and the migration runner is responsible for recording applied steps in `nextpatch_migrations` history.
+SQLite 移行の正本は `drizzle/*.sql` 以下の手書き SQL です。
+それらのファイルがテーブル、制約、インデックスの正しい定義を持ち、migration runner は適用済みステップを `nextpatch_migrations` 履歴に記録する役割を持ちます。
 
-`src/server/db/schema.ts` is used for Drizzle query typing and should stay aligned with the SQL, but it is not the canonical source for FK or CHECK constraints.
+`src/server/db/schema.ts` は Drizzle のクエリ型付けに使われ、SQL と整合している必要がありますが、FK や CHECK 制約の正本ではありません。
 
-Do not use `db:generate` for SQLite migrations; the project does not keep `drizzle-kit` as a dev dependency. New schema changes should be written directly as SQL migrations and added to the migration history through the runner.
+SQLite の migration では `db:generate` を使わないでください。このプロジェクトは `drizzle-kit` を dev dependency として保持していません。新しいスキーマ変更は SQL migration を直接書き、runner 経由で migration history に追加してください。
 
 ## Backup
 
-Use Settings > Data to create a JSON export. Keep that JSON export as the canonical backup artifact.
-Markdown and CSV exports are for reading and audit only.
+Settings > Data から JSON エクスポートを作成してください。その JSON エクスポートを正規のバックアップ成果物として保持します。
+Markdown と CSV のエクスポートは閲覧と監査用途に限ります。
 
-For the database volume, keep `data/`, `exports/`, and `backups/` out of Git. SQLite WAL and SHM sidecar files must stay with the database file while the app is running.
+DB ボリュームについては、`data/`、`exports/`、`backups/` を Git 管理から外してください。SQLite の WAL / SHM 付随ファイルは、アプリ実行中は DB ファイルと一緒に置いておく必要があります。
 
-When DB file backup is implemented, prefer SQLite-safe backup approaches such as JSON export or a controlled SQLite backup operation rather than copying a live database file.
+DB ファイルのバックアップが実装されたら、稼働中の DB ファイルを単純コピーするのではなく、JSON エクスポートや制御された SQLite backup 操作のような SQLite 安全な方法を優先してください。
 
-Do not commit backups to GitHub automatically. They may contain confidential repository notes.
+バックアップを GitHub に自動コミットしないでください。機密性のあるリポジトリメモを含む可能性があります。
 
 ## Restore
 
-Restore is not implemented in the MVP. Treat JSON backup as the preserved backup source for future manual migration or later restore work.
-The MVP does not merge into an existing workspace and does not restore from Markdown or CSV.
+Restore は MVP では未実装です。JSON バックアップを、将来の手動移行や後続の restore 作業に使う保存済みバックアップソースとして扱ってください。
+MVP は既存ワークスペースへのマージも、Markdown や CSV からの restore も行いません。
 
 ## Docker Build Note
 
-The SQLite implementation is expected to use `better-sqlite3`, which has a native addon.
-If the dependency is added while using the Alpine Docker image, the deps stage must include the native build toolchain needed by `node-gyp` such as Python, make, and a C++ compiler, or the image should move to a Debian-based Node image.
+SQLite 実装では native addon を持つ `better-sqlite3` を使う想定です。
+Alpine ベースの Docker イメージでこの依存関係を追加する場合、deps ステージに Python、make、C++ コンパイラなど `node-gyp` に必要な native build toolchain を含めるか、Debian ベースの Node イメージへ切り替えてください。
 
 ## Fresh Start
 
-For a clean local restart, stop the app, remove the SQLite database with `pnpm db:reset:dev`, then rerun migrations and seed. In Docker, `docker compose down -v` also removes the data volume if you want to discard persistent state completely.
+きれいにローカルを再起動するには、アプリを停止し、`pnpm db:reset:dev` で SQLite DB を削除してから、migration と seed を再実行してください。Docker では、永続状態を完全に破棄したい場合に `docker compose down -v` でデータボリュームも削除できます。
 
-## Login Route
+## Login
 
-`/login` is the local password login surface. It uses a signed HttpOnly cookie session and redirects authenticated users to `/dashboard`.
+`/login` は LAN 内利用向けの共通パスワードログイン画面です。ログインに成功すると署名付き HttpOnly Cookie セッションを発行し、指定された安全な内部パス、または `/dashboard` に遷移します。ログアウトはアプリヘッダーの「ログアウト」ボタンから行います。
+
+`NEXTPATCH_LOGIN_PASSWORD` または `NEXTPATCH_SESSION_SECRET` が未設定の場合、保護対象画面は利用できません。`/login` に設定不足の通知が表示されます。
 
 ## External Exposure
 
-External publication is not recommended for the MVP.
-The app is a local single-user build with password-based access control, so exposing it on a LAN still needs HTTPS, a strong password, and a trusted network boundary.
-The default compose port binding is local-only; if you change it for LAN exposure, add HTTPS, an explicit access-control layer, regular JSON exports, DB volume backups, and firewall rules first.
+この実装は、信頼できる LAN 内での簡易保護を目的としています。NextPatch を直接インターネットに公開しないでください。
+インターネット公開やリモートアクセスが必要な場合は、この実装だけでは不十分です。別途 HTTPS、リバースプロキシ、ファイアウォール、アクセス制御、バックアップ運用などを設計し、HTTPS 終端時は `NEXTPATCH_COOKIE_SECURE=true` を設定してください。
