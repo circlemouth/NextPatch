@@ -67,7 +67,9 @@ export async function updateWorkItemStatusCommand(workspaceId: string, userId: s
     const item = tx
       .select()
       .from(workItems)
-      .where(and(eq(workItems.workspaceId, workspaceId), eq(workItems.id, id), isNull(workItems.deletedAt)))
+      .where(
+        and(eq(workItems.workspaceId, workspaceId), eq(workItems.id, id), isNull(workItems.archivedAt), isNull(workItems.deletedAt))
+      )
       .get();
 
     if (!item) {
@@ -89,7 +91,15 @@ export async function updateWorkItemStatusCommand(workspaceId: string, userId: s
         statusChangedAt: timestamps.status_changed_at,
         updatedAt: now
       })
-      .where(and(eq(workItems.workspaceId, workspaceId), eq(workItems.id, id), eq(workItems.status, item.status)))
+      .where(
+        and(
+          eq(workItems.workspaceId, workspaceId),
+          eq(workItems.id, id),
+          eq(workItems.status, item.status),
+          isNull(workItems.archivedAt),
+          isNull(workItems.deletedAt)
+        )
+      )
       .run();
 
     if (result.changes !== 1) {
@@ -157,7 +167,7 @@ export async function getWorkItemById(workspaceId: string, id: string): Promise<
 }
 
 function selectWorkItems(workspaceId: string, ...extraConditions: SQL[]) {
-  const conditions = [eq(workItems.workspaceId, workspaceId), isNull(workItems.deletedAt)];
+  const conditions = [eq(workItems.workspaceId, workspaceId), isNull(workItems.archivedAt), isNull(workItems.deletedAt)];
   conditions.push(...extraConditions);
 
   const rows = getDb()

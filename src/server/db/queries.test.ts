@@ -15,6 +15,7 @@ import {
   listAllMemoWorkItems,
   listMemoWorkItems,
   listWorkItems,
+  listWorkItemsForRepository,
   updateWorkItemStatusCommand
 } from "@/server/db/queries/work-items";
 import { migrateDatabase } from "@/server/db/migrate";
@@ -276,6 +277,170 @@ describe("SQLite work item and classification queries", () => {
     await expect(getWorkItemById(ctx.workspaceId, archivedId)).resolves.toBeNull();
     await expect(getWorkItemById(ctx.workspaceId, deletedId)).resolves.toBeNull();
     await expect(getWorkItemById(ctx.workspaceId, otherWorkspaceItemId)).resolves.toBeNull();
+  });
+
+  it("listWorkItems excludes archived and deleted items", async () => {
+    const ctx = setup();
+    const activeId = await createWorkItemCommand({
+      workspaceId: ctx.workspaceId,
+      userId: ctx.userId,
+      repositoryId: null,
+      scope: "global",
+      type: "task",
+      title: "Active list item",
+      status: "todo",
+      priority: "p2",
+      sourceType: "manual",
+      privacyLevel: "normal",
+      isPinned: false
+    });
+    const archivedId = await createWorkItemCommand({
+      workspaceId: ctx.workspaceId,
+      userId: ctx.userId,
+      repositoryId: null,
+      scope: "global",
+      type: "task",
+      title: "Archived list item",
+      status: "todo",
+      priority: "p2",
+      sourceType: "manual",
+      privacyLevel: "normal",
+      isPinned: false
+    });
+    const deletedId = await createWorkItemCommand({
+      workspaceId: ctx.workspaceId,
+      userId: ctx.userId,
+      repositoryId: null,
+      scope: "global",
+      type: "task",
+      title: "Deleted list item",
+      status: "todo",
+      priority: "p2",
+      sourceType: "manual",
+      privacyLevel: "normal",
+      isPinned: false
+    });
+    const now = "2026-04-21T00:00:00.000Z";
+
+    getSqlite().prepare("update work_items set archived_at = ? where id = ?").run(now, archivedId);
+    getSqlite().prepare("update work_items set deleted_at = ? where id = ?").run(now, deletedId);
+
+    const ids = (await listWorkItems(ctx.workspaceId)).map((item) => item.id);
+    expect(ids).toContain(activeId);
+    expect(ids).not.toContain(archivedId);
+    expect(ids).not.toContain(deletedId);
+  });
+
+  it("listMemoWorkItems excludes archived and deleted memos", async () => {
+    const ctx = setup();
+    const activeId = await quickCaptureCommand({
+      workspaceId: ctx.workspaceId,
+      userId: ctx.userId,
+      repositoryId: null,
+      scope: "inbox",
+      type: "memo",
+      title: "Active memo list item",
+      body: "memo body",
+      privacyLevel: "normal",
+      isPinned: false,
+      sourceType: "manual",
+      importResult: { format: "markdown", candidates: [] }
+    });
+    const archivedId = await quickCaptureCommand({
+      workspaceId: ctx.workspaceId,
+      userId: ctx.userId,
+      repositoryId: null,
+      scope: "inbox",
+      type: "memo",
+      title: "Archived memo list item",
+      body: "memo body",
+      privacyLevel: "normal",
+      isPinned: false,
+      sourceType: "manual",
+      importResult: { format: "markdown", candidates: [] }
+    });
+    const deletedId = await quickCaptureCommand({
+      workspaceId: ctx.workspaceId,
+      userId: ctx.userId,
+      repositoryId: null,
+      scope: "inbox",
+      type: "memo",
+      title: "Deleted memo list item",
+      body: "memo body",
+      privacyLevel: "normal",
+      isPinned: false,
+      sourceType: "manual",
+      importResult: { format: "markdown", candidates: [] }
+    });
+    const now = "2026-04-21T00:00:00.000Z";
+
+    getSqlite().prepare("update work_items set archived_at = ? where id = ?").run(now, archivedId);
+    getSqlite().prepare("update work_items set deleted_at = ? where id = ?").run(now, deletedId);
+
+    const ids = (await listMemoWorkItems(ctx.workspaceId)).map((item) => item.id);
+    expect(ids).toContain(activeId);
+    expect(ids).not.toContain(archivedId);
+    expect(ids).not.toContain(deletedId);
+  });
+
+  it("listWorkItemsForRepository excludes archived and deleted items", async () => {
+    const ctx = setup();
+    const repositoryId = await createRepositoryCommand({
+      workspaceId: ctx.workspaceId,
+      userId: ctx.userId,
+      provider: "manual",
+      name: "Repository list guard repo",
+      productionStatus: "development",
+      criticality: "medium"
+    });
+    const activeId = await createWorkItemCommand({
+      workspaceId: ctx.workspaceId,
+      userId: ctx.userId,
+      repositoryId,
+      scope: "repository",
+      type: "task",
+      title: "Active repository list item",
+      status: "todo",
+      priority: "p2",
+      sourceType: "manual",
+      privacyLevel: "normal",
+      isPinned: false
+    });
+    const archivedId = await createWorkItemCommand({
+      workspaceId: ctx.workspaceId,
+      userId: ctx.userId,
+      repositoryId,
+      scope: "repository",
+      type: "task",
+      title: "Archived repository list item",
+      status: "todo",
+      priority: "p2",
+      sourceType: "manual",
+      privacyLevel: "normal",
+      isPinned: false
+    });
+    const deletedId = await createWorkItemCommand({
+      workspaceId: ctx.workspaceId,
+      userId: ctx.userId,
+      repositoryId,
+      scope: "repository",
+      type: "task",
+      title: "Deleted repository list item",
+      status: "todo",
+      priority: "p2",
+      sourceType: "manual",
+      privacyLevel: "normal",
+      isPinned: false
+    });
+    const now = "2026-04-21T00:00:00.000Z";
+
+    getSqlite().prepare("update work_items set archived_at = ? where id = ?").run(now, archivedId);
+    getSqlite().prepare("update work_items set deleted_at = ? where id = ?").run(now, deletedId);
+
+    const ids = (await listWorkItemsForRepository(ctx.workspaceId, repositoryId)).map((item) => item.id);
+    expect(ids).toContain(activeId);
+    expect(ids).not.toContain(archivedId);
+    expect(ids).not.toContain(deletedId);
   });
 
   it("validates repository references before creating work items", async () => {
@@ -755,6 +920,54 @@ describe("SQLite work item and classification queries", () => {
       "Work item not found"
     );
   });
+
+  it("rejects archived and deleted status updates without writing history", async () => {
+    const ctx = setup();
+    const archivedId = await createWorkItemCommand({
+      workspaceId: ctx.workspaceId,
+      userId: ctx.userId,
+      repositoryId: null,
+      scope: "global",
+      type: "task",
+      title: "Archived status item",
+      status: "todo",
+      priority: "p2",
+      sourceType: "manual",
+      privacyLevel: "normal",
+      isPinned: false
+    });
+    const deletedId = await createWorkItemCommand({
+      workspaceId: ctx.workspaceId,
+      userId: ctx.userId,
+      repositoryId: null,
+      scope: "global",
+      type: "task",
+      title: "Deleted status item",
+      status: "todo",
+      priority: "p2",
+      sourceType: "manual",
+      privacyLevel: "normal",
+      isPinned: false
+    });
+    const now = "2026-04-21T00:00:00.000Z";
+
+    getSqlite().prepare("update work_items set archived_at = ? where id = ?").run(now, archivedId);
+    getSqlite().prepare("update work_items set deleted_at = ? where id = ?").run(now, deletedId);
+
+    for (const [itemId, expectedState] of [
+      [archivedId, { status: "todo", archived_at: now, deleted_at: null }],
+      [deletedId, { status: "todo", archived_at: null, deleted_at: now }]
+    ] as const) {
+      await expect(updateWorkItemStatusCommand(ctx.workspaceId, ctx.userId, itemId, "done")).rejects.toThrow("Work item not found");
+
+      expect(getSqlite().prepare("select status, archived_at, deleted_at from work_items where id = ?").get(itemId)).toEqual(
+        expectedState
+      );
+      expect(getSqlite().prepare("select count(*) as count from status_histories where work_item_id = ?").get(itemId)).toEqual({
+        count: 0
+      });
+    }
+  });
 });
 
 describe("SQLite dashboard and export queries", () => {
@@ -802,5 +1015,95 @@ describe("SQLite dashboard and export queries", () => {
     expect(csv).toContain('"Ship ""backup"""');
     expect(markdown).toContain("- Production repo");
     expect(exportLogCount.count).toBe(1);
+  });
+
+  it("excludes archived and deleted work items from dashboard queries and recent completions", async () => {
+    const ctx = setup();
+    const activeOpenId = await createWorkItemCommand({
+      workspaceId: ctx.workspaceId,
+      userId: ctx.userId,
+      repositoryId: null,
+      scope: "global",
+      type: "task",
+      title: "Active dashboard open item",
+      status: "todo",
+      priority: "p0",
+      sourceType: "manual",
+      privacyLevel: "normal",
+      isPinned: false
+    });
+    const archivedOpenId = await createWorkItemCommand({
+      workspaceId: ctx.workspaceId,
+      userId: ctx.userId,
+      repositoryId: null,
+      scope: "global",
+      type: "task",
+      title: "Archived dashboard open item",
+      status: "todo",
+      priority: "p0",
+      sourceType: "manual",
+      privacyLevel: "normal",
+      isPinned: false
+    });
+    const activeCompletedId = await createWorkItemCommand({
+      workspaceId: ctx.workspaceId,
+      userId: ctx.userId,
+      repositoryId: null,
+      scope: "global",
+      type: "task",
+      title: "Active dashboard completed item",
+      status: "todo",
+      priority: "p2",
+      sourceType: "manual",
+      privacyLevel: "normal",
+      isPinned: false
+    });
+    const archivedCompletedId = await createWorkItemCommand({
+      workspaceId: ctx.workspaceId,
+      userId: ctx.userId,
+      repositoryId: null,
+      scope: "global",
+      type: "task",
+      title: "Archived dashboard completed item",
+      status: "todo",
+      priority: "p2",
+      sourceType: "manual",
+      privacyLevel: "normal",
+      isPinned: false
+    });
+    const deletedCompletedId = await createWorkItemCommand({
+      workspaceId: ctx.workspaceId,
+      userId: ctx.userId,
+      repositoryId: null,
+      scope: "global",
+      type: "task",
+      title: "Deleted dashboard completed item",
+      status: "todo",
+      priority: "p2",
+      sourceType: "manual",
+      privacyLevel: "normal",
+      isPinned: false
+    });
+    const now = "2026-04-21T00:00:00.000Z";
+
+    await updateWorkItemStatusCommand(ctx.workspaceId, ctx.userId, activeCompletedId, "done");
+    await updateWorkItemStatusCommand(ctx.workspaceId, ctx.userId, archivedCompletedId, "done");
+    await updateWorkItemStatusCommand(ctx.workspaceId, ctx.userId, deletedCompletedId, "done");
+    getSqlite().prepare("update work_items set archived_at = ? where id in (?, ?)").run(now, archivedOpenId, archivedCompletedId);
+    getSqlite().prepare("update work_items set deleted_at = ? where id = ?").run(now, deletedCompletedId);
+
+    const queryIds = (await listDashboardWorkItems(ctx.workspaceId)).map((item) => item.id);
+    expect(queryIds).toContain(activeOpenId);
+    expect(queryIds).toContain(activeCompletedId);
+    expect(queryIds).not.toContain(archivedOpenId);
+    expect(queryIds).not.toContain(archivedCompletedId);
+    expect(queryIds).not.toContain(deletedCompletedId);
+
+    const dashboard = await getDashboard();
+    expect(dashboard.now.map((item) => item.id)).toContain(activeOpenId);
+    expect(dashboard.now.map((item) => item.id)).not.toContain(archivedOpenId);
+    expect(dashboard.recentCompleted.map((item) => item.id)).toContain(activeCompletedId);
+    expect(dashboard.recentCompleted.map((item) => item.id)).not.toContain(archivedCompletedId);
+    expect(dashboard.recentCompleted.map((item) => item.id)).not.toContain(deletedCompletedId);
   });
 });
