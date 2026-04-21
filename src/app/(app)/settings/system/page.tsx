@@ -36,8 +36,8 @@ export default function SystemSettingsPage() {
         <section className="banner banner--warning" aria-labelledby="lan-heading">
           <h2 id="lan-heading">LAN 公開時の注意</h2>
           <p>
-            初期実装はローカル単一ユーザー前提です。信頼できる端末だけが届く localhost または信頼済み LAN で使い、
-            公開ネットワークへ直接出さないでください。
+            初期実装は無認証の local single-user 前提で、access control は未実装です。
+            信頼できる端末だけが届く localhost または信頼済み LAN で使い、公開ネットワークへ直接出さないでください。
           </p>
         </section>
       </div>

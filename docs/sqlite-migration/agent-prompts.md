@@ -426,7 +426,7 @@ JSON / CSV / Markdown export を Supabase query から SQLite query に置換し
 6. toMarkdownExport / toCsvExport の既存仕様を維持する。
 7. JSON backup の integrity hash を維持する。
 8. settings/data の注意文をローカル継続運用向けに変更する。
-   - JSON export は復元可能な正本。
+   - JSON export は正本 backup として保管する。
    - Markdown / CSV は棚卸し用。
    - SQLite DB ファイルの手動コピーは WAL に注意。
    - GitHub token 等は DB に保存しない。

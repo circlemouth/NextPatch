@@ -32,6 +32,7 @@ docker compose up -d
 
 The compose file starts the NextPatch web container, runs database init on container start, and mounts the SQLite data volume at `/app/data`.
 It binds only to `127.0.0.1:3000` so the service stays on the local machine by default.
+Use this path when you want the app running as a persistent local server.
 
 ## Stop
 
@@ -52,7 +53,7 @@ Do not use `db:generate` for SQLite migrations. New schema changes should be wri
 
 ## Backup
 
-Use Settings > Data to create a JSON export. JSON export is the reversible backup format for restoring into a new workspace.
+Use Settings > Data to create a JSON export. Keep that JSON export as the canonical backup artifact.
 Markdown and CSV exports are for reading and audit only.
 
 For the database volume, keep `data/`, `exports/`, and `backups/` out of Git. SQLite WAL and SHM sidecar files must stay with the database file while the app is running.
@@ -63,7 +64,7 @@ Do not commit backups to GitHub automatically. They may contain confidential rep
 
 ## Restore
 
-Use Settings > Data to validate and restore a JSON backup into a new workspace.
+Restore is not implemented in the MVP. Treat JSON backup as the preserved backup source for future manual migration or later restore work.
 The MVP does not merge into an existing workspace and does not restore from Markdown or CSV.
 
 ## Docker Build Note
@@ -75,7 +76,12 @@ If the dependency is added while using the Alpine Docker image, the deps stage m
 
 For a clean local restart, stop the app, remove the SQLite database with `pnpm db:reset:dev`, then rerun migrations and seed. In Docker, `docker compose down -v` also removes the data volume if you want to discard persistent state completely.
 
+## Login Route
+
+`/login` is kept only as a bookmark-safe redirect to `/dashboard`. It is not a login feature, and the app does not include a login form, magic link flow, or auth callback in the SQLite local MVP.
+
 ## External Exposure
 
 External publication is not recommended for the MVP.
-If you expose it outside a trusted LAN, use HTTPS, an explicit access-control layer, regular JSON exports, DB volume backups, and firewall rules. The default compose port binding is local-only; change it explicitly if you intend to publish the service on your LAN.
+The app is a local single-user build with access control not implemented, so exposing it on a LAN is unsafe unless you add your own protection layer.
+The default compose port binding is local-only; if you change it for LAN exposure, add HTTPS, an explicit access-control layer, regular JSON exports, DB volume backups, and firewall rules first.

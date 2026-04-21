@@ -5,7 +5,7 @@ export default function DataSettingsPage() {
         <p className="eyebrow">Data</p>
         <h1>データ管理</h1>
         <p className="support">
-          JSON export は復元可能な正本です。Markdown / CSV は読み取りと棚卸し用に使ってください。
+          JSON export は正本 backup として保管します。Markdown / CSV は読み取りと棚卸し用に使ってください。
         </p>
       </header>
       <div className="section-stack">
@@ -14,7 +14,7 @@ export default function DataSettingsPage() {
           <p>
             SQLite DB ファイルを手動コピーする場合は WAL / SHM ファイルとの整合性に注意してください。
             安全な DB ファイル backup が必要な場合は SQLite Online Backup API または VACUUM INTO 相当を使います。
-            初期実装では JSON export を復元用の正本として扱います。
+            初期実装では JSON export を正本 backup として保管し、restore は未実装です。
           </p>
         </section>
         <section className="banner banner--warning">
@@ -32,9 +32,11 @@ export default function DataSettingsPage() {
             <a className="button button--secondary" href="/api/export/csv">CSV export</a>
           </div>
         </section>
-        <section className="panel">
-          <h2>Import / Restore</h2>
-          <p>復元は MVP では新規 workspace のみです。既存 workspace へのマージは実装していません。</p>
+        <section className="banner banner--warning">
+          <strong>Import / Restore は未実装</strong>
+          <p>
+            この画面には restore 操作はありません。JSON export は正本 backup として保管し、必要な場合は将来の手動移行対象として扱ってください。
+          </p>
         </section>
       </div>
     </main>
