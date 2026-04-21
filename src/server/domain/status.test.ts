@@ -16,6 +16,27 @@ describe("status lifecycle", () => {
     expect(isClosed("bug", "not_planned")).toBe(true);
   });
 
+  it("treats canceled bug and future feature statuses as closed", () => {
+    expect(isClosed("bug", "canceled")).toBe(true);
+    expect(isClosed("future_feature", "canceled")).toBe(true);
+    expect(
+      isOpen({
+        type: "bug",
+        status: "canceled",
+        archived_at: null,
+        deleted_at: null
+      })
+    ).toBe(false);
+    expect(
+      isOpen({
+        type: "future_feature",
+        status: "canceled",
+        archived_at: null,
+        deleted_at: null
+      })
+    ).toBe(false);
+  });
+
   it("sets completed and closed timestamps for completed status", () => {
     const result = applyStatusTimestamps(
       { type: "task", status: "todo", completed_at: null, closed_at: null },

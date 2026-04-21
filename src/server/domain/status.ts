@@ -17,10 +17,10 @@ const completedStatuses: Record<WorkItemType, string[]> = {
 
 const closedOnlyStatuses: Record<WorkItemType, string[]> = {
   task: ["canceled", "duplicate"],
-  bug: ["cannot_reproduce", "works_as_designed", "not_planned", "duplicate"],
+  bug: ["cannot_reproduce", "works_as_designed", "not_planned", "canceled", "duplicate"],
   idea: ["rejected", "duplicate"],
   implementation: ["canceled", "duplicate"],
-  future_feature: ["rejected", "duplicate"],
+  future_feature: ["rejected", "canceled", "duplicate"],
   memo: ["discarded", "duplicate"]
 };
 

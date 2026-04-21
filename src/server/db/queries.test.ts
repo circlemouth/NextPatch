@@ -8,7 +8,14 @@ import { LOCAL_USER_ID, PERSONAL_WORKSPACE_ID } from "@/server/auth/session";
 import { closeDatabaseConnection, getSqlite } from "@/server/db/client";
 import { classifyMemoCommand, quickCaptureCommand } from "@/server/db/queries/classification";
 import { archiveRepositoryCommand, createRepositoryCommand, getRepositoryById, listRepositories } from "@/server/db/queries/repositories";
-import { createWorkItemCommand, listAllMemoWorkItems, listMemoWorkItems, listWorkItems, updateWorkItemStatusCommand } from "@/server/db/queries/work-items";
+import {
+  createWorkItemCommand,
+  getWorkItemById,
+  listAllMemoWorkItems,
+  listMemoWorkItems,
+  listWorkItems,
+  updateWorkItemStatusCommand
+} from "@/server/db/queries/work-items";
 import { migrateDatabase } from "@/server/db/migrate";
 import { seedDatabase } from "@/server/db/seed";
 import { getDashboard } from "@/server/domain/dashboard";
@@ -200,6 +207,74 @@ describe("SQLite work item and classification queries", () => {
     expect(getSqlite().prepare("select count(*) as count from work_items where title = ?").get("Invalid initial status")).toEqual({
       count: 0
     });
+  });
+
+  it("gets only active work items by id within the workspace", async () => {
+    const ctx = setup();
+    const activeId = await createWorkItemCommand({
+      workspaceId: ctx.workspaceId,
+      userId: ctx.userId,
+      repositoryId: null,
+      scope: "global",
+      type: "task",
+      title: "Active detail item",
+      status: "todo",
+      priority: "p2",
+      sourceType: "manual",
+      privacyLevel: "normal",
+      isPinned: false
+    });
+    const archivedId = await createWorkItemCommand({
+      workspaceId: ctx.workspaceId,
+      userId: ctx.userId,
+      repositoryId: null,
+      scope: "global",
+      type: "task",
+      title: "Archived detail item",
+      status: "todo",
+      priority: "p2",
+      sourceType: "manual",
+      privacyLevel: "normal",
+      isPinned: false
+    });
+    const deletedId = await createWorkItemCommand({
+      workspaceId: ctx.workspaceId,
+      userId: ctx.userId,
+      repositoryId: null,
+      scope: "global",
+      type: "task",
+      title: "Deleted detail item",
+      status: "todo",
+      priority: "p2",
+      sourceType: "manual",
+      privacyLevel: "normal",
+      isPinned: false
+    });
+    const otherWorkspaceId = "other-workspace";
+    const otherWorkspaceItemId = crypto.randomUUID();
+    const now = "2026-04-21T00:00:00.000Z";
+
+    getSqlite().prepare("update work_items set archived_at = ? where id = ?").run(now, archivedId);
+    getSqlite().prepare("update work_items set deleted_at = ? where id = ?").run(now, deletedId);
+    getSqlite()
+      .prepare(
+        `insert or ignore into workspaces (id, owner_user_id, name, created_at, updated_at)
+         values (?, ?, ?, ?, ?)`
+      )
+      .run(otherWorkspaceId, ctx.userId, otherWorkspaceId, now, now);
+    getSqlite()
+      .prepare(
+        `insert into work_items (
+          id, workspace_id, user_id, repository_id, scope, type, title, status, priority,
+          source_type, privacy_level, is_pinned, created_at, updated_at
+        ) values (?, ?, ?, null, 'global', 'task', 'Other workspace detail item', 'todo', 'p2', 'manual', 'normal', 0, ?, ?)`
+      )
+      .run(otherWorkspaceItemId, otherWorkspaceId, ctx.userId, now, now);
+
+    await expect(getWorkItemById(ctx.workspaceId, activeId)).resolves.toEqual(expect.objectContaining({ id: activeId }));
+    await expect(getWorkItemById(ctx.workspaceId, archivedId)).resolves.toBeNull();
+    await expect(getWorkItemById(ctx.workspaceId, deletedId)).resolves.toBeNull();
+    await expect(getWorkItemById(ctx.workspaceId, otherWorkspaceItemId)).resolves.toBeNull();
   });
 
   it("validates repository references before creating work items", async () => {
@@ -453,6 +528,96 @@ describe("SQLite work item and classification queries", () => {
 
     expect(getSqlite().prepare("select status from work_items where id = ?").get(memoId)).toEqual({ status: "unreviewed" });
     expect(getSqlite().prepare("select count(*) as count from work_items where title = ?").get("Classified into other workspace repo")).toEqual({
+      count: 0
+    });
+  });
+
+  it("rejects archived and deleted memo classification without side effects", async () => {
+    const ctx = setup();
+    const archivedMemoId = await quickCaptureCommand({
+      workspaceId: ctx.workspaceId,
+      userId: ctx.userId,
+      repositoryId: null,
+      scope: "inbox",
+      type: "memo",
+      title: "Archived source memo",
+      body: "memo body",
+      privacyLevel: "normal",
+      isPinned: false,
+      sourceType: "manual",
+      importResult: { format: "markdown", candidates: [] }
+    });
+    const deletedMemoId = await quickCaptureCommand({
+      workspaceId: ctx.workspaceId,
+      userId: ctx.userId,
+      repositoryId: null,
+      scope: "inbox",
+      type: "memo",
+      title: "Deleted source memo",
+      body: "memo body",
+      privacyLevel: "normal",
+      isPinned: false,
+      sourceType: "manual",
+      importResult: { format: "markdown", candidates: [] }
+    });
+    const now = "2026-04-21T00:00:00.000Z";
+
+    getSqlite().prepare("update work_items set archived_at = ? where id = ?").run(now, archivedMemoId);
+    getSqlite().prepare("update work_items set deleted_at = ? where id = ?").run(now, deletedMemoId);
+
+    for (const [memoId, title, expectedState] of [
+      [archivedMemoId, "Classified archived memo", { status: "unreviewed", archived_at: now, deleted_at: null }],
+      [deletedMemoId, "Classified deleted memo", { status: "unreviewed", archived_at: null, deleted_at: now }]
+    ] as const) {
+      await expect(
+        classifyMemoCommand({
+          workspaceId: ctx.workspaceId,
+          userId: ctx.userId,
+          memoId,
+          repositoryId: null,
+          targetType: "task",
+          title,
+          priority: "p2"
+        })
+      ).rejects.toThrow("Unreviewed memo not found");
+
+      expect(getSqlite().prepare("select status, archived_at, deleted_at from work_items where id = ?").get(memoId)).toEqual(
+        expectedState
+      );
+      expect(getSqlite().prepare("select count(*) as count from work_items where title = ?").get(title)).toEqual({ count: 0 });
+    }
+  });
+
+  it("rejects memo as a classification target without side effects", async () => {
+    const ctx = setup();
+    const memoId = await quickCaptureCommand({
+      workspaceId: ctx.workspaceId,
+      userId: ctx.userId,
+      repositoryId: null,
+      scope: "inbox",
+      type: "memo",
+      title: "Memo target source",
+      body: "memo body",
+      privacyLevel: "normal",
+      isPinned: false,
+      sourceType: "manual",
+      importResult: { format: "markdown", candidates: [] }
+    });
+
+    await expect(
+      classifyMemoCommand({
+        workspaceId: ctx.workspaceId,
+        userId: ctx.userId,
+        memoId,
+        repositoryId: null,
+        targetType: "memo" as Parameters<typeof classifyMemoCommand>[0]["targetType"],
+        title: "Invalid memo target",
+        priority: "p2"
+      })
+    ).rejects.toThrow("Memo cannot be used as a classification target");
+
+    expect(getSqlite().prepare("select status from work_items where id = ?").get(memoId)).toEqual({ status: "unreviewed" });
+    expect(getSqlite().prepare("select count(*) as count from work_items where title = ?").get("Invalid memo target")).toEqual({
       count: 0
     });
   });
