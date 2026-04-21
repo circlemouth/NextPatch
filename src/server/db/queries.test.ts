@@ -7,7 +7,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { LOCAL_USER_ID, PERSONAL_WORKSPACE_ID } from "@/server/auth/session";
 import { closeDatabaseConnection, getSqlite } from "@/server/db/client";
 import { classifyMemoCommand, quickCaptureCommand } from "@/server/db/queries/classification";
-import { archiveRepositoryCommand, createRepositoryCommand, listRepositories } from "@/server/db/queries/repositories";
+import { archiveRepositoryCommand, createRepositoryCommand, getRepositoryById, listRepositories } from "@/server/db/queries/repositories";
 import { createWorkItemCommand, listAllMemoWorkItems, listMemoWorkItems, listWorkItems, updateWorkItemStatusCommand } from "@/server/db/queries/work-items";
 import { migrateDatabase } from "@/server/db/migrate";
 import { seedDatabase } from "@/server/db/seed";
@@ -45,6 +45,35 @@ function setup() {
   };
 }
 
+function insertRepositoryDirectly(input: {
+  workspaceId: string;
+  userId: string;
+  name: string;
+  archivedAt?: string | null;
+  deletedAt?: string | null;
+}) {
+  const id = crypto.randomUUID();
+  const now = "2026-04-21T00:00:00.000Z";
+
+  getSqlite()
+    .prepare(
+      `insert or ignore into workspaces (id, owner_user_id, name, created_at, updated_at)
+       values (?, ?, ?, ?, ?)`
+    )
+    .run(input.workspaceId, input.userId, input.workspaceId, now, now);
+
+  getSqlite()
+    .prepare(
+      `insert into repositories (
+        id, workspace_id, user_id, provider, name, production_status, criticality,
+        created_at, updated_at, archived_at, deleted_at
+      ) values (?, ?, ?, 'manual', ?, 'development', 'medium', ?, ?, ?, ?)`
+    )
+    .run(id, input.workspaceId, input.userId, input.name, now, now, input.archivedAt ?? null, input.deletedAt ?? null);
+
+  return id;
+}
+
 describe("SQLite repository queries", () => {
   it("creates, lists, and archives repositories within the personal workspace", async () => {
     const ctx = setup();
@@ -70,6 +99,34 @@ describe("SQLite repository queries", () => {
     await archiveRepositoryCommand(ctx.workspaceId, id);
 
     expect(await listRepositories(ctx.workspaceId)).toEqual([]);
+  });
+
+  it("gets only active repositories by id", async () => {
+    const ctx = setup();
+    const activeId = await createRepositoryCommand({
+      workspaceId: ctx.workspaceId,
+      userId: ctx.userId,
+      provider: "manual",
+      name: "Active repo",
+      productionStatus: "development",
+      criticality: "medium"
+    });
+    const archivedId = insertRepositoryDirectly({
+      workspaceId: ctx.workspaceId,
+      userId: ctx.userId,
+      name: "Archived repo",
+      archivedAt: "2026-04-21T00:00:00.000Z"
+    });
+    const deletedId = insertRepositoryDirectly({
+      workspaceId: ctx.workspaceId,
+      userId: ctx.userId,
+      name: "Deleted repo",
+      deletedAt: "2026-04-21T00:00:00.000Z"
+    });
+
+    expect(await getRepositoryById(ctx.workspaceId, activeId)).toEqual(expect.objectContaining({ id: activeId }));
+    expect(await getRepositoryById(ctx.workspaceId, archivedId)).toBeNull();
+    expect(await getRepositoryById(ctx.workspaceId, deletedId)).toBeNull();
   });
 });
 
@@ -104,6 +161,128 @@ describe("SQLite work item and classification queries", () => {
     const histories = getSqlite().prepare("select from_status, to_status from status_histories").all();
     expect((await listWorkItems(ctx.workspaceId))[0]).toMatchObject({ id: itemId, status: "resolved" });
     expect(histories).toEqual([{ from_status: "unconfirmed", to_status: "resolved" }]);
+  });
+
+  it("validates initial status before creating work items", async () => {
+    const ctx = setup();
+
+    const itemId = await createWorkItemCommand({
+      workspaceId: ctx.workspaceId,
+      userId: ctx.userId,
+      repositoryId: null,
+      scope: "global",
+      type: "task",
+      title: "Valid initial status",
+      status: "todo",
+      priority: "p2",
+      sourceType: "manual",
+      privacyLevel: "normal",
+      isPinned: false
+    });
+
+    await expect(
+      createWorkItemCommand({
+        workspaceId: ctx.workspaceId,
+        userId: ctx.userId,
+        repositoryId: null,
+        scope: "global",
+        type: "task",
+        title: "Invalid initial status",
+        status: "resolved",
+        priority: "p2",
+        sourceType: "manual",
+        privacyLevel: "normal",
+        isPinned: false
+      })
+    ).rejects.toThrow("Unsupported status for task: resolved");
+
+    expect(getSqlite().prepare("select id from work_items where title = ?").get("Valid initial status")).toEqual({ id: itemId });
+    expect(getSqlite().prepare("select count(*) as count from work_items where title = ?").get("Invalid initial status")).toEqual({
+      count: 0
+    });
+  });
+
+  it("validates repository references before creating work items", async () => {
+    const ctx = setup();
+    const activeRepositoryId = await createRepositoryCommand({
+      workspaceId: ctx.workspaceId,
+      userId: ctx.userId,
+      provider: "manual",
+      name: "Active command repo",
+      productionStatus: "development",
+      criticality: "medium"
+    });
+    const otherWorkspaceRepositoryId = insertRepositoryDirectly({
+      workspaceId: "other-workspace",
+      userId: ctx.userId,
+      name: "Other workspace repo"
+    });
+    const archivedRepositoryId = insertRepositoryDirectly({
+      workspaceId: ctx.workspaceId,
+      userId: ctx.userId,
+      name: "Archived command repo",
+      archivedAt: "2026-04-21T00:00:00.000Z"
+    });
+    const deletedRepositoryId = insertRepositoryDirectly({
+      workspaceId: ctx.workspaceId,
+      userId: ctx.userId,
+      name: "Deleted command repo",
+      deletedAt: "2026-04-21T00:00:00.000Z"
+    });
+
+    await expect(
+      createWorkItemCommand({
+        workspaceId: ctx.workspaceId,
+        userId: ctx.userId,
+        repositoryId: activeRepositoryId,
+        scope: "repository",
+        type: "task",
+        title: "Valid repository item",
+        status: "todo",
+        priority: "p2",
+        sourceType: "manual",
+        privacyLevel: "normal",
+        isPinned: false
+      })
+    ).resolves.toEqual(expect.any(String));
+
+    await expect(
+      createWorkItemCommand({
+        workspaceId: ctx.workspaceId,
+        userId: ctx.userId,
+        repositoryId: null,
+        scope: "global",
+        type: "task",
+        title: "Null repository item",
+        status: "todo",
+        priority: "p2",
+        sourceType: "manual",
+        privacyLevel: "normal",
+        isPinned: false
+      })
+    ).resolves.toEqual(expect.any(String));
+
+    for (const repositoryId of [otherWorkspaceRepositoryId, archivedRepositoryId, deletedRepositoryId]) {
+      await expect(
+        createWorkItemCommand({
+          workspaceId: ctx.workspaceId,
+          userId: ctx.userId,
+          repositoryId,
+          scope: "repository",
+          type: "task",
+          title: `Rejected repository item ${repositoryId}`,
+          status: "todo",
+          priority: "p2",
+          sourceType: "manual",
+          privacyLevel: "normal",
+          isPinned: false
+        })
+      ).rejects.toThrow(`Active repository not found in workspace: ${repositoryId}`);
+    }
+
+    expect(getSqlite().prepare("select count(*) as count from work_items where title like 'Rejected repository item%'").get()).toEqual({
+      count: 0
+    });
   });
 
   it("applies default statuses when quick capturing different types", async () => {
@@ -174,6 +353,35 @@ describe("SQLite work item and classification queries", () => {
     ]);
   });
 
+  it("rejects quick capture repository references outside the workspace", async () => {
+    const ctx = setup();
+    const otherWorkspaceRepositoryId = insertRepositoryDirectly({
+      workspaceId: "other-workspace",
+      userId: ctx.userId,
+      name: "Other quick capture repo"
+    });
+
+    await expect(
+      quickCaptureCommand({
+        workspaceId: ctx.workspaceId,
+        userId: ctx.userId,
+        repositoryId: otherWorkspaceRepositoryId,
+        scope: "repository",
+        type: "task",
+        title: "Cross workspace quick capture",
+        body: "body",
+        privacyLevel: "normal",
+        isPinned: false,
+        sourceType: "manual",
+        importResult: { format: "markdown", candidates: [] }
+      })
+    ).rejects.toThrow(`Active repository not found in workspace: ${otherWorkspaceRepositoryId}`);
+
+    expect(getSqlite().prepare("select count(*) as count from work_items where title = ?").get("Cross workspace quick capture")).toEqual({
+      count: 0
+    });
+  });
+
   it("lists only unreviewed memos in the inbox query", async () => {
     const ctx = setup();
 
@@ -208,6 +416,45 @@ describe("SQLite work item and classification queries", () => {
     expect(await listAllMemoWorkItems(ctx.workspaceId)).toEqual([
       expect.objectContaining({ id: memoId, status: "itemized", type: "memo" })
     ]);
+  });
+
+  it("rejects memo classification repository references outside the workspace", async () => {
+    const ctx = setup();
+    const memoId = await quickCaptureCommand({
+      workspaceId: ctx.workspaceId,
+      userId: ctx.userId,
+      repositoryId: null,
+      scope: "inbox",
+      type: "memo",
+      title: "Classify with invalid repository",
+      body: "memo body",
+      privacyLevel: "normal",
+      isPinned: false,
+      sourceType: "manual",
+      importResult: { format: "markdown", candidates: [] }
+    });
+    const otherWorkspaceRepositoryId = insertRepositoryDirectly({
+      workspaceId: "other-workspace",
+      userId: ctx.userId,
+      name: "Other classify repo"
+    });
+
+    await expect(
+      classifyMemoCommand({
+        workspaceId: ctx.workspaceId,
+        userId: ctx.userId,
+        memoId,
+        repositoryId: otherWorkspaceRepositoryId,
+        targetType: "task",
+        title: "Classified into other workspace repo",
+        priority: "p2"
+      })
+    ).rejects.toThrow(`Active repository not found in workspace: ${otherWorkspaceRepositoryId}`);
+
+    expect(getSqlite().prepare("select status from work_items where id = ?").get(memoId)).toEqual({ status: "unreviewed" });
+    expect(getSqlite().prepare("select count(*) as count from work_items where title = ?").get("Classified into other workspace repo")).toEqual({
+      count: 0
+    });
   });
 
   it("rejects invalid memo classification attempts", async () => {

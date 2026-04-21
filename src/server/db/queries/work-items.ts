@@ -5,6 +5,7 @@ import { applyStatusTimestamps, assertAllowedWorkItemStatus } from "@/server/dom
 import type { Priority, PrivacyLevel, SourceType, WorkItemRow, WorkItemScope, WorkItemType } from "@/server/types";
 import { assertPersonalWorkspaceScope } from "./context";
 import { toWorkItemRow } from "./mappers";
+import { assertActiveRepositoryInWorkspace } from "./repositories";
 
 type CreateWorkItemInput = {
   workspaceId: string;
@@ -26,6 +27,8 @@ type CreateWorkItemInput = {
 
 export async function createWorkItemCommand(input: CreateWorkItemInput) {
   assertPersonalWorkspaceScope(input.workspaceId);
+  assertAllowedWorkItemStatus(input.type, input.status);
+  assertActiveRepositoryInWorkspace(input.workspaceId, input.repositoryId);
 
   const id = crypto.randomUUID();
   const now = new Date().toISOString();

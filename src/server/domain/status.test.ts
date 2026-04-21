@@ -1,5 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { applyStatusTimestamps, assertAllowedWorkItemStatus, isAllowedWorkItemStatus, isClosed, isCompleted, isOnHold, isOpen } from "./status";
+import {
+  applyStatusTimestamps,
+  assertAllowedWorkItemStatus,
+  getWorkItemStatusActions,
+  isAllowedWorkItemStatus,
+  isClosed,
+  isCompleted,
+  isOnHold,
+  isOpen
+} from "./status";
 
 describe("status lifecycle", () => {
   it("separates completed and closed", () => {
@@ -56,5 +65,28 @@ describe("status lifecycle", () => {
     expect(isAllowedWorkItemStatus("memo", "itemized")).toBe(true);
     expect(isAllowedWorkItemStatus("task", "itemized")).toBe(false);
     expect(() => assertAllowedWorkItemStatus("task", "resolved")).toThrow("Unsupported status for task: resolved");
+  });
+
+  it("returns only allowed statuses for UI status actions", () => {
+    const examples = [
+      { type: "task" as const, status: "todo" },
+      { type: "bug" as const, status: "confirmed" },
+      { type: "idea" as const, status: "in_review" },
+      { type: "implementation" as const, status: "doing" },
+      { type: "future_feature" as const, status: "todo" },
+      { type: "memo" as const, status: "unreviewed" }
+    ];
+
+    for (const item of examples) {
+      for (const action of getWorkItemStatusActions(item)) {
+        expect(isAllowedWorkItemStatus(item.type, action.status)).toBe(true);
+      }
+    }
+
+    expect(getWorkItemStatusActions({ type: "bug", status: "confirmed" }).map((action) => action.status)).toEqual([
+      "doing",
+      "fixed_waiting"
+    ]);
+    expect(getWorkItemStatusActions({ type: "memo", status: "unreviewed" })).toEqual([]);
   });
 });

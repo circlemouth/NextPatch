@@ -2,6 +2,7 @@ import { createWorkItem, updateWorkItemStatus } from "@/server/actions/work-item
 import { requireLocalContext } from "@/server/auth/session";
 import { getRepositoryById } from "@/server/db/queries/repositories";
 import { listWorkItemsForRepository } from "@/server/db/queries/work-items";
+import { getWorkItemStatusActions } from "@/server/domain/status";
 import { notFound } from "next/navigation";
 
 type RepositoryDetailPageProps = {
@@ -35,23 +36,39 @@ export default async function RepositoryDetailPage({ params }: RepositoryDetailP
         <section className="panel">
           <h2>次アクションと項目</h2>
           <div className="card-list">
-            {workItems.map((item) => (
-              <article className="item-card" key={item.id}>
-                <h3>{item.title}</h3>
-                <div className="meta-row">
-                  <span className="badge">{item.type}</span>
-                  <span className="badge">{item.status}</span>
-                  <span className="badge">{item.priority}</span>
-                </div>
-                {item.body ? <p>{item.body}</p> : null}
-                <form action={updateWorkItemStatus} className="button-row">
-                  <input type="hidden" name="id" value={item.id} />
-                  <button className="button button--secondary" name="status" value={item.type === "bug" ? "fixed_waiting" : "done"} type="submit">
-                    {item.type === "bug" ? "修正済み・確認待ち" : "完了"}
-                  </button>
-                </form>
-              </article>
-            ))}
+            {workItems.map((item) => {
+              const statusActions = getWorkItemStatusActions(item);
+
+              return (
+                <article className="item-card" key={item.id}>
+                  <h3>{item.title}</h3>
+                  <div className="meta-row">
+                    <span className="badge">{item.type}</span>
+                    <span className="badge">{item.status}</span>
+                    <span className="badge">{item.priority}</span>
+                  </div>
+                  {item.body ? <p>{item.body}</p> : null}
+                  {statusActions.length > 0 ? (
+                    <form action={updateWorkItemStatus} className="button-row">
+                      <input type="hidden" name="id" value={item.id} />
+                      {statusActions.map((action) => (
+                        <button
+                          className={`button button--${action.style}`}
+                          key={action.status}
+                          name="status"
+                          value={action.status}
+                          type="submit"
+                        >
+                          {action.label}
+                        </button>
+                      ))}
+                    </form>
+                  ) : (
+                    <p className="support">この状態で実行できる状態変更はありません。</p>
+                  )}
+                </article>
+              );
+            })}
           </div>
         </section>
         <section className="panel">
