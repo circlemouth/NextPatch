@@ -1,6 +1,6 @@
 import crypto from "node:crypto";
 import { requireLocalContext } from "@/server/auth/session";
-import { readBackupEntities } from "@/server/db/queries/export";
+import { insertExportLog, readBackupEntities, type ExportFormat } from "@/server/db/queries/export";
 
 export type BackupDocument = {
   format: "nextpatch.backup";
@@ -22,13 +22,14 @@ export type BackupDocument = {
   };
 };
 
-export async function createBackupDocument(): Promise<BackupDocument> {
-  const { workspace } = await requireLocalContext();
+export async function createBackupDocument(format: ExportFormat = "json"): Promise<BackupDocument> {
+  const { user, workspace } = await requireLocalContext();
   const entities = await readBackupEntities(workspace.id);
 
   const counts = Object.fromEntries(Object.entries(entities).map(([key, value]) => [key, value.length]));
   const hashPayload = JSON.stringify({ entities, counts });
   const contentHash = `sha256:${crypto.createHash("sha256").update(hashPayload).digest("hex")}`;
+  insertExportLog({ workspaceId: workspace.id, userId: user.id, format, contentHash });
 
   return {
     format: "nextpatch.backup",

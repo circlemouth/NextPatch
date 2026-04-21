@@ -1,9 +1,11 @@
+import crypto from "node:crypto";
 import { eq } from "drizzle-orm";
 import { PERSONAL_WORKSPACE_ID } from "@/server/auth/session";
 import { getDb } from "@/server/db/client";
 import {
   bugDetails,
   classificationCandidates,
+  exportLogs,
   ideas,
   referenceServices,
   repositories,
@@ -18,6 +20,8 @@ import {
 } from "@/server/db/schema";
 import { assertPersonalWorkspaceScope } from "./context";
 import { toPlainRow } from "./mappers";
+
+export type ExportFormat = "json" | "csv" | "markdown";
 
 export async function readBackupEntities(workspaceId = PERSONAL_WORKSPACE_ID) {
   assertPersonalWorkspaceScope(workspaceId);
@@ -50,4 +54,20 @@ function scoped<TTable extends { _: { columns: Record<string, unknown> } }>(
     .where(eq(workspaceColumn, workspaceId))
     .all()
     .map(toPlainRow);
+}
+
+export function insertExportLog(input: { workspaceId: string; userId: string; format: ExportFormat; contentHash: string }) {
+  assertPersonalWorkspaceScope(input.workspaceId);
+
+  getDb()
+    .insert(exportLogs)
+    .values({
+      id: crypto.randomUUID(),
+      workspaceId: input.workspaceId,
+      userId: input.userId,
+      format: input.format,
+      contentHash: input.contentHash,
+      createdAt: new Date().toISOString()
+    })
+    .run();
 }

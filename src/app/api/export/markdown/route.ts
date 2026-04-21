@@ -1,7 +1,9 @@
 import { createBackupDocument, toMarkdownExport } from "@/server/domain/export";
 
+export const runtime = "nodejs";
+
 export async function GET() {
-  const backup = await createBackupDocument();
+  const backup = await createBackupDocument("markdown");
   return new Response(toMarkdownExport(backup), {
     headers: {
       "Content-Type": "text/markdown; charset=utf-8",
