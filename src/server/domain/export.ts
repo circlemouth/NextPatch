@@ -1,5 +1,10 @@
 import crypto from "node:crypto";
-import { requireSession } from "@/server/auth/session";
+import {
+  getLocalExportContext,
+  insertExportLog,
+  readWorkspaceExportEntities,
+  type ExportFormat
+} from "@/server/db/queries/export";
 
 export type BackupDocument = {
   format: "nextpatch.backup";
@@ -21,39 +26,14 @@ export type BackupDocument = {
   };
 };
 
-const entityTables = [
-  ["workspaces", "workspaces"],
-  ["workspaceMembers", "workspace_members"],
-  ["repositories", "repositories"],
-  ["workItems", "work_items"],
-  ["bugDetails", "bug_details"],
-  ["ideas", "ideas"],
-  ["techNotes", "tech_notes"],
-  ["referenceServices", "reference_services"],
-  ["tags", "tags"],
-  ["workItemTags", "work_item_tags"],
-  ["statusHistories", "status_histories"],
-  ["repositoryVersions", "repository_versions"],
-  ["classificationCandidates", "classification_candidates"]
-] as const;
-
-export async function createBackupDocument(): Promise<BackupDocument> {
-  const { supabase, workspace } = await requireSession();
-  const entities: Record<string, unknown[]> = {};
-
-  for (const [entityName, tableName] of entityTables) {
-    const query = supabase.from(tableName).select("*");
-    const { data, error } =
-      tableName === "workspaces" ? await query.eq("id", workspace.id) : await query.eq("workspace_id", workspace.id);
-    if (error) {
-      throw error;
-    }
-    entities[entityName] = data ?? [];
-  }
+export async function createBackupDocument(format: ExportFormat = "json"): Promise<BackupDocument> {
+  const { user, workspace } = getLocalExportContext();
+  const entities = readWorkspaceExportEntities(workspace.id);
 
   const counts = Object.fromEntries(Object.entries(entities).map(([key, value]) => [key, value.length]));
   const hashPayload = JSON.stringify({ entities, counts });
   const contentHash = `sha256:${crypto.createHash("sha256").update(hashPayload).digest("hex")}`;
+  insertExportLog({ workspaceId: workspace.id, userId: user.id, format, contentHash });
 
   return {
     format: "nextpatch.backup",

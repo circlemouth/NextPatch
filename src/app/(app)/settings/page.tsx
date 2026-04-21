@@ -17,7 +17,7 @@ export default function SettingsPage() {
         </section>
         <section className="panel">
           <h2>システム状態</h2>
-          <p>runtime、DB/Auth、SMTP 注意を確認します。</p>
+          <p>runtime、SQLite DB path、WAL backup 注意を確認します。</p>
           <Link className="button button--secondary" href="/settings/system">
             システム状態を開く
           </Link>

@@ -10,6 +10,14 @@ test-results
 .env.local
 .env.*.local
 exports
+/data/
+/backups/
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+*.db
+*.db-wal
+*.db-shm
 supabase/.branches
 supabase/.temp
 NextPatch-review.zip
