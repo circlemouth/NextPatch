@@ -5,13 +5,17 @@ const DEFAULT_DATA_DIR = "./data";
 const DEFAULT_DB_FILE = "nextpatch.sqlite";
 const DEFAULT_EXPORT_DIR = "exports";
 
+function resolveRuntimePath(value: string) {
+  return path.isAbsolute(value) ? value : path.join(/*turbopackIgnore: true*/ process.cwd(), value);
+}
+
 export function getDataDir() {
-  return path.resolve(process.env.NEXTPATCH_DATA_DIR ?? DEFAULT_DATA_DIR);
+  return resolveRuntimePath(process.env.NEXTPATCH_DATA_DIR ?? DEFAULT_DATA_DIR);
 }
 
 export function getDatabasePath() {
   const explicitPath = process.env.NEXTPATCH_DB_PATH;
-  return path.resolve(explicitPath ?? path.join(getDataDir(), DEFAULT_DB_FILE));
+  return explicitPath ? resolveRuntimePath(explicitPath) : path.join(getDataDir(), DEFAULT_DB_FILE);
 }
 
 export function getDbPath() {
@@ -20,7 +24,7 @@ export function getDbPath() {
 
 export function getExportDir() {
   const explicitPath = process.env.NEXTPATCH_EXPORT_DIR;
-  return path.resolve(explicitPath ?? path.join(getDataDir(), DEFAULT_EXPORT_DIR));
+  return explicitPath ? resolveRuntimePath(explicitPath) : path.join(getDataDir(), DEFAULT_EXPORT_DIR);
 }
 
 export function getRuntimeInfo() {
