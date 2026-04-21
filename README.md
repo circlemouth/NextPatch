@@ -28,6 +28,7 @@ docker compose up -d
 ```
 
 The compose file starts the NextPatch web container and mounts the SQLite data volume at `/app/data`.
+By default, the local server is meant to be opened from `http://localhost:3000` on the host machine.
 Use this path when you want the app running as a persistent local server.
 
 ## Stop
@@ -40,7 +41,7 @@ Use `docker compose down` to stop the daily local server stack.
 
 ## Backup
 
-Use Settings > Data to create a JSON export. JSON export is the reversible backup format for restoring into a new workspace.
+Use Settings > Data to create a JSON export. Keep that JSON export as the canonical backup artifact.
 Markdown and CSV exports are for reading and audit only.
 
 For the database volume, keep `data/`, `exports/`, and `backups/` out of Git. SQLite WAL and SHM sidecar files must stay with the database file while the app is running.
@@ -51,7 +52,7 @@ Do not commit backups to GitHub automatically. They may contain confidential rep
 
 ## Restore
 
-Use Settings > Data to validate and restore a JSON backup into a new workspace.
+Restore is not implemented in the MVP. Treat JSON backup as the preserved backup source for future manual migration or later restore work.
 The MVP does not merge into an existing workspace and does not restore from Markdown or CSV.
 
 ## Docker Build Note
@@ -62,4 +63,5 @@ If the dependency is added while using the Alpine Docker image, the deps/builder
 ## External Exposure
 
 External publication is not recommended for the MVP.
+The app is a local single-user build with access control not implemented, so exposing it on a LAN is unsafe unless you add your own protection layer.
 If you expose it outside a trusted LAN, use HTTPS, an explicit access-control layer, regular JSON exports, DB volume backups, and firewall rules.

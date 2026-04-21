@@ -10,7 +10,7 @@ export default function SettingsPage() {
       <div className="section-stack">
         <section className="panel">
           <h2>データ管理</h2>
-          <p>JSON export は復元可能な正本バックアップです。</p>
+          <p>JSON export は正本 backup として保管します。restore は未実装です。</p>
           <Link className="button" href="/settings/data">
             データ管理を開く
           </Link>
