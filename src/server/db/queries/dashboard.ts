@@ -19,7 +19,7 @@ export async function listDashboardWorkItems(workspaceId = PERSONAL_WORKSPACE_ID
     })
     .from(workItems)
     .leftJoin(repositories, eq(workItems.repositoryId, repositories.id))
-    .where(and(eq(workItems.workspaceId, PERSONAL_WORKSPACE_ID), isNull(workItems.deletedAt)))
+    .where(and(eq(workItems.workspaceId, workspaceId), isNull(workItems.deletedAt)))
     .orderBy(desc(workItems.updatedAt))
     .limit(100)
     .all();

@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { LOCAL_USER_ID, PERSONAL_WORKSPACE_ID } from "@/server/auth/session";
 import { closeDatabaseConnection, getSqlite } from "@/server/db/client";
 import { classifyMemoCommand, quickCaptureCommand } from "@/server/db/queries/classification";
+import { listDashboardWorkItems } from "@/server/db/queries/dashboard";
 import { archiveRepositoryCommand, createRepositoryCommand, getRepositoryById, listRepositories } from "@/server/db/queries/repositories";
 import { createWorkItemCommand, listAllMemoWorkItems, listMemoWorkItems, listWorkItems, updateWorkItemStatusCommand } from "@/server/db/queries/work-items";
 import { migrateDatabase } from "@/server/db/migrate";
@@ -592,6 +593,12 @@ describe("SQLite work item and classification queries", () => {
 });
 
 describe("SQLite dashboard and export queries", () => {
+  it("rejects dashboard queries outside the personal workspace", async () => {
+    setup();
+
+    await expect(listDashboardWorkItems("other-workspace")).rejects.toThrow("Unsupported workspace scope: other-workspace");
+  });
+
   it("builds dashboard buckets and export artifacts from local SQLite data", async () => {
     const ctx = setup();
     const repositoryId = await createRepositoryCommand({
