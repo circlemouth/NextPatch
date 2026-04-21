@@ -2,8 +2,8 @@ import { expect, test, type Page } from "@playwright/test";
 
 test.describe.configure({ mode: "serial" });
 
-test("SQLite local smoke: dashboard, CRUD-ish flows, memo classification, and export links", async ({ page }) => {
-  const suffix = Date.now();
+test("SQLite local smoke: dashboard, CRUD-ish flows, memo classification, and export links", async ({ page }, testInfo) => {
+  const suffix = `${Date.now()}-${testInfo.project.name}`;
 
   await gotoOrSkipUntilSQLiteUiExists(page, "/");
   await expect(page).toHaveURL(/\/dashboard$/);
@@ -28,19 +28,21 @@ test("SQLite local smoke: dashboard, CRUD-ish flows, memo classification, and ex
   await page.getByLabel(/本文/).fill("Created by SQLite QA smoke.");
   await page.getByRole("button", { name: "保存" }).click();
   await expect(page.getByText(`QA Bug ${suffix}`)).toBeVisible();
-  await page.getByRole("button", { name: "完了扱いにする" }).first().click();
-  await expect(page.getByText("resolved").or(page.getByText("done"))).toBeVisible();
+  await page.goto("/work-items");
+  const workItemCard = page.locator("article").filter({ has: page.getByRole("heading", { name: `QA Bug ${suffix}` }) });
+  await workItemCard.getByRole("button", { name: "完了扱いにする" }).click();
+  await expect(workItemCard.getByText("resolved")).toBeVisible();
 
   await page.goto("/capture/new");
   await page.getByLabel(/本文/).fill(`QA memo ${suffix}\nClassify this memo.`);
   await page.getByRole("button", { name: "保存" }).click();
   await page.goto("/inbox");
-  await expect(page.getByText(`QA memo ${suffix}`)).toBeVisible();
+  await expect(page.getByRole("heading", { name: `QA memo ${suffix}` })).toBeVisible();
   await page.getByLabel(/分類先/).first().selectOption("task");
   await page.getByLabel(/タイトル/).first().fill(`QA classified task ${suffix}`);
   await page.getByRole("button", { name: "分類して作成" }).first().click();
   await page.goto("/work-items");
-  await expect(page.getByText(`QA classified task ${suffix}`)).toBeVisible();
+  await expect(page.getByRole("heading", { name: `QA classified task ${suffix}` })).toBeVisible();
 
   await page.goto("/settings/data");
   await expect(page.getByRole("link", { name: "JSON export" })).toHaveAttribute("href", "/api/export/json");
