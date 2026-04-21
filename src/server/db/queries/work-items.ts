@@ -148,7 +148,9 @@ export async function getWorkItemById(workspaceId: string, id: string): Promise<
     })
     .from(workItems)
     .leftJoin(repositories, eq(workItems.repositoryId, repositories.id))
-    .where(and(eq(workItems.workspaceId, workspaceId), eq(workItems.id, id)))
+    .where(
+      and(eq(workItems.workspaceId, workspaceId), eq(workItems.id, id), isNull(workItems.archivedAt), isNull(workItems.deletedAt))
+    )
     .get();
 
   return row ? toWorkItemRow(row.item, row.repository) : null;

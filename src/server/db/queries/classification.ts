@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { getDb } from "@/server/db/client";
 import { classificationCandidates, workItems } from "@/server/db/schema";
 import { applyStatusTimestamps } from "@/server/domain/status";
@@ -7,6 +7,8 @@ import type { ImportCandidate, ImportParseResult } from "@/server/domain/import-
 import type { PrivacyLevel, SourceType, WorkItemScope, WorkItemType } from "@/server/types";
 import { assertPersonalWorkspaceScope } from "./context";
 import { assertActiveRepositoryInWorkspace } from "./repositories";
+
+type ClassifiableWorkItemType = Exclude<WorkItemType, "memo">;
 
 type QuickCaptureInput = {
   workspaceId: string;
@@ -27,7 +29,7 @@ type ClassifyMemoInput = {
   userId: string;
   memoId: string;
   repositoryId: string | null;
-  targetType: WorkItemType;
+  targetType: ClassifiableWorkItemType;
   title: string;
   body?: string | null;
   priority: "p0" | "p1" | "p2" | "p3" | "p4";
@@ -77,6 +79,11 @@ export async function quickCaptureCommand(input: QuickCaptureInput) {
 
 export async function classifyMemoCommand(input: ClassifyMemoInput) {
   assertPersonalWorkspaceScope(input.workspaceId);
+
+  if ((input.targetType as WorkItemType) === "memo") {
+    throw new Error("Memo cannot be used as a classification target");
+  }
+
   assertActiveRepositoryInWorkspace(input.workspaceId, input.repositoryId);
 
   const id = crypto.randomUUID();
@@ -86,7 +93,14 @@ export async function classifyMemoCommand(input: ClassifyMemoInput) {
     const memo = tx
       .select()
       .from(workItems)
-      .where(and(eq(workItems.workspaceId, input.workspaceId), eq(workItems.id, input.memoId)))
+      .where(
+        and(
+          eq(workItems.workspaceId, input.workspaceId),
+          eq(workItems.id, input.memoId),
+          isNull(workItems.archivedAt),
+          isNull(workItems.deletedAt)
+        )
+      )
       .get();
 
     if (!memo) {
