@@ -16,6 +16,10 @@ export async function loginAction(formData: FormData) {
   }
 
   const password = formData.get("password")?.toString() ?? "";
+  if (password.trim().length === 0) {
+    redirect(getLoginPath(nextPath, "required"));
+  }
+
   if (!isPasswordMatch(password, config.loginPassword)) {
     redirect(getLoginPath(nextPath, "invalid"));
   }

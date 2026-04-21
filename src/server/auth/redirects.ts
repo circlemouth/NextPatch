@@ -28,12 +28,13 @@ export function isPublicPath(pathname: string): boolean {
     pathname === "/login" ||
     pathname === "/favicon.ico" ||
     pathname === "/robots.txt" ||
+    pathname === "/manifest.webmanifest" ||
     pathname.startsWith("/_next/")
   ) {
     return true;
   }
 
-  return pathname.includes(".") && !pathname.startsWith("/api/");
+  return false;
 }
 
 export function isProtectedPath(pathname: string): boolean {

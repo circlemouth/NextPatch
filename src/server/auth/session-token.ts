@@ -12,24 +12,28 @@ export async function createSessionToken(payload: SessionTokenPayload, secret: s
 }
 
 export async function verifySessionToken(token: string, secret: string, now = currentEpochSeconds()): Promise<SessionTokenPayload | null> {
-  const parts = token.split(".");
-  if (parts.length !== 4 || parts[0] !== "v1") {
+  try {
+    const parts = token.split(".");
+    if (parts.length !== 4 || parts[0] !== "v1") {
+      return null;
+    }
+
+    const issuedAt = parseEpochSeconds(parts[1]);
+    const expiresAt = parseEpochSeconds(parts[2]);
+    if (issuedAt === null || expiresAt === null || expiresAt <= issuedAt || expiresAt <= now) {
+      return null;
+    }
+
+    const data = `${parts[0]}.${parts[1]}.${parts[2]}`;
+    const isValid = await verifySignature(data, parts[3], secret);
+    if (!isValid) {
+      return null;
+    }
+
+    return { issuedAt, expiresAt };
+  } catch {
     return null;
   }
-
-  const issuedAt = parseEpochSeconds(parts[1]);
-  const expiresAt = parseEpochSeconds(parts[2]);
-  if (issuedAt === null || expiresAt === null || expiresAt <= issuedAt || expiresAt <= now) {
-    return null;
-  }
-
-  const data = `${parts[0]}.${parts[1]}.${parts[2]}`;
-  const isValid = await verifySignature(data, parts[3], secret);
-  if (!isValid) {
-    return null;
-  }
-
-  return { issuedAt, expiresAt };
 }
 
 function encodePayload(payload: SessionTokenPayload) {
@@ -69,6 +73,10 @@ function toBase64Url(bytes: Uint8Array) {
 }
 
 function fromBase64Url(value: string) {
+  if (!/^[A-Za-z0-9_-]*$/.test(value)) {
+    throw new Error("Invalid base64url value");
+  }
+
   return fromBase64(value.replaceAll("-", "+").replaceAll("_", "/"));
 }
 

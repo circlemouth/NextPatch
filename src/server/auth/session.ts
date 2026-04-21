@@ -1,5 +1,7 @@
 import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 import { getAuthConfig, SESSION_COOKIE_NAME } from "@/server/auth/config";
+import { getLoginPath } from "@/server/auth/redirects";
 import { verifySessionToken } from "@/server/auth/session-token";
 
 export const LOCAL_USER_ID = "local-user";
@@ -45,7 +47,7 @@ export async function getAuthenticatedLocalContext(): Promise<LocalContext | nul
   try {
     cookieStore = await cookies();
   } catch {
-    return isTestRuntime() ? LOCAL_CONTEXT : null;
+    return null;
   }
 
   const token = cookieStore.get(SESSION_COOKIE_NAME)?.value;
@@ -66,6 +68,15 @@ export async function requireLocalContext(): Promise<LocalContext> {
   const context = await getAuthenticatedLocalContext();
   if (!context) {
     throw new UnauthorizedError();
+  }
+
+  return context;
+}
+
+export async function requireLocalContextForPage(nextPath?: string): Promise<LocalContext> {
+  const context = await getAuthenticatedLocalContext();
+  if (!context) {
+    redirect(getLoginPath(nextPath));
   }
 
   return context;
@@ -97,8 +108,4 @@ function readCookieValue(cookieHeader: string | null | undefined, name: string) 
   }
 
   return undefined;
-}
-
-function isTestRuntime() {
-  return process.env.NODE_ENV === "test" || process.env.VITEST === "true";
 }

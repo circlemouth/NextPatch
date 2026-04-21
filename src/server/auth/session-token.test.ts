@@ -18,4 +18,17 @@ describe("session tokens", () => {
     const tampered = `${version}.${issuedAt}.2001.${signature}`;
     await expect(verifySessionToken(tampered, "secret", 1500)).resolves.toBeNull();
   });
+
+  it("returns null for a malformed percent signature", async () => {
+    await expect(verifySessionToken("v1.1000.2000.%", "secret", 1500)).resolves.toBeNull();
+  });
+
+  it("returns null for a malformed punctuation signature", async () => {
+    await expect(verifySessionToken("v1.1000.2000.!!!!", "secret", 1500)).resolves.toBeNull();
+  });
+
+  it("returns null for tokens with an invalid number of parts", async () => {
+    await expect(verifySessionToken("v1.1000.2000", "secret", 1500)).resolves.toBeNull();
+    await expect(verifySessionToken("v1.1000.2000.signature.extra", "secret", 1500)).resolves.toBeNull();
+  });
 });

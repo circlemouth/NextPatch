@@ -3,7 +3,29 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("@/server/auth/session", () => ({
+  LOCAL_USER_ID: "local-user",
+  PERSONAL_WORKSPACE_ID: "personal-workspace",
+  UnauthorizedError: class UnauthorizedError extends Error {
+    constructor() {
+      super("Unauthorized");
+    }
+  },
+  requireLocalContext: vi.fn(async () => ({
+    user: {
+      id: "local-user",
+      email: null,
+      displayName: "Local user"
+    },
+    workspace: {
+      id: "personal-workspace",
+      name: "Personal workspace"
+    }
+  }))
+}));
+
 import { LOCAL_USER_ID, PERSONAL_WORKSPACE_ID } from "@/server/auth/session";
 import { closeDatabaseConnection, getSqlite } from "@/server/db/client";
 import { classifyMemoCommand, quickCaptureCommand } from "@/server/db/queries/classification";

@@ -6,6 +6,9 @@ test("SQLite local smoke: dashboard, CRUD-ish flows, memo classification, and ex
   const suffix = `${Date.now()}-${testInfo.project.name}`;
   const guards = installPageGuards(page);
 
+  const unauthenticatedExportResponse = await page.request.get("/api/export/json");
+  expect(unauthenticatedExportResponse.status()).toBe(401);
+
   await gotoAndAssertHealthy(page, guards, "/dashboard", "dashboard redirect");
   await expect(page).toHaveURL(/\/login\?next=%2Fdashboard$/);
   await expect(page.getByRole("heading", { name: "LAN内利用向けの簡易ログイン" })).toBeVisible();
@@ -17,6 +20,12 @@ test("SQLite local smoke: dashboard, CRUD-ish flows, memo classification, and ex
   await expect(page.getByText("＊パスワードが一致しません。管理者が設定したログインパスワードを入力してください。")).toBeVisible();
   await expect(page).toHaveURL(/\/login\?next=%2Fdashboard&error=invalid$/);
   await guards.assertHealthy("invalid login");
+
+  await page.getByLabel(/ログインパスワード/).fill("   ");
+  await page.getByRole("button", { name: "ログイン" }).click();
+  await expect(page.getByText("＊ログインパスワードを入力してください。")).toBeVisible();
+  await expect(page).toHaveURL(/\/login\?next=%2Fdashboard&error=required$/);
+  await guards.assertHealthy("required login");
 
   await page.getByLabel(/ログインパスワード/).fill("e2e-password");
   await page.getByRole("button", { name: "ログイン" }).click();
@@ -87,6 +96,13 @@ test("SQLite local smoke: dashboard, CRUD-ish flows, memo classification, and ex
   await assertExportRouteOk(page, "/api/export/markdown");
   await assertExportRouteOk(page, "/api/export/csv");
   await guards.assertHealthy("export links");
+
+  await page.getByRole("button", { name: "ログアウト" }).click();
+  await expect(page).toHaveURL(/\/login$/);
+  await gotoAndAssertHealthy(page, guards, "/dashboard", "dashboard after logout");
+  await expect(page).toHaveURL(/\/login\?next=%2Fdashboard$/);
+  await expect(page.getByRole("heading", { name: "LAN内利用向けの簡易ログイン" })).toBeVisible();
+  await guards.assertHealthy("logout redirects to login");
 });
 
 function installPageGuards(page: Page) {

@@ -27,6 +27,10 @@ describe("path guards", () => {
     expect(isPublicPath("/favicon.ico")).toBe(true);
     expect(isPublicPath("/robots.txt")).toBe(true);
   });
+
+  it("does not treat dotted app paths as public", () => {
+    expect(isPublicPath("/repositories/foo.bar")).toBe(false);
+  });
 });
 
 describe("getLoginPath", () => {

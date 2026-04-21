@@ -12,6 +12,7 @@ export const metadata: Metadata = {
 };
 
 const errorMessages = {
+  required: "＊ログインパスワードを入力してください。",
   invalid: "＊パスワードが一致しません。管理者が設定したログインパスワードを入力してください。",
   "missing-config":
     "＊ログイン設定が不足しています。.env の NEXTPATCH_LOGIN_PASSWORD と NEXTPATCH_SESSION_SECRET を設定してから再起動してください。"
