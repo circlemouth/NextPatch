@@ -1,3 +1,4 @@
+import { logoutAction } from "@/server/auth/actions";
 import { requireLocalContext } from "@/server/auth/session";
 import Link from "next/link";
 
@@ -45,6 +46,11 @@ export default async function AppLayout({
               <Link className="button" href="/capture/new">
                 Quick Capture
               </Link>
+              <form action={logoutAction}>
+                <button className="button button--secondary" type="submit">
+                  ログアウト
+                </button>
+              </form>
             </div>
           </header>
           {children}
