@@ -1,3 +1,4 @@
+import fs from "node:fs";
 import path from "node:path";
 
 const DEFAULT_DATA_DIR = "./data";
@@ -13,7 +14,23 @@ export function getDatabasePath() {
   return path.resolve(explicitPath ?? path.join(getDataDir(), DEFAULT_DB_FILE));
 }
 
+export function getDbPath() {
+  return getDatabasePath();
+}
+
 export function getExportDir() {
   const explicitPath = process.env.NEXTPATCH_EXPORT_DIR;
   return path.resolve(explicitPath ?? path.join(getDataDir(), DEFAULT_EXPORT_DIR));
+}
+
+export function getRuntimeInfo() {
+  const dbPath = getDatabasePath();
+
+  return {
+    runtime: process.env.NEXTPATCH_RUNTIME_MODE ?? "local-server",
+    dataDir: getDataDir(),
+    dbPath,
+    exportDir: getExportDir(),
+    dbFileExists: fs.existsSync(dbPath)
+  };
 }

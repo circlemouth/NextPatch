@@ -12,7 +12,7 @@ export default async function WorkItemsPage() {
       <header className="page-header">
         <p className="eyebrow">Work Items</p>
         <h1>横断 WorkItem</h1>
-        <p className="support">repositoryId が null の未整理・横断項目も表示します。</p>
+        <p className="support">リポジトリ未紐づけのメモや横断項目もローカル DB から表示します。</p>
       </header>
       <div className="grid-8-4">
         <section className="panel">
@@ -43,7 +43,10 @@ export default async function WorkItemsPage() {
           <h2>新規作成</h2>
           <form action={createWorkItem} className="form-stack">
             <div className="field">
-              <label htmlFor="repositoryId">Repository<span className="required">※任意</span></label>
+              <label htmlFor="repositoryId">
+                Repository<span className="required">※任意</span>
+              </label>
+              <p className="support">特定のリポジトリに紐づく作業だけ選択します。</p>
               <select id="repositoryId" name="repositoryId" defaultValue="">
                 <option value="">未紐づけ</option>
                 {repositories.map((repository) => (
@@ -52,7 +55,10 @@ export default async function WorkItemsPage() {
               </select>
             </div>
             <div className="field">
-              <label htmlFor="type">種類<span className="required">※必須</span></label>
+              <label htmlFor="type">
+                種類<span className="required">※必須</span>
+              </label>
+              <p className="support">迷う場合は task を選びます。</p>
               <select id="type" name="type" defaultValue="task">
                 <option value="task">task</option>
                 <option value="bug">bug</option>
@@ -63,11 +69,17 @@ export default async function WorkItemsPage() {
               </select>
             </div>
             <div className="field">
-              <label htmlFor="title">タイトル<span className="required">※必須</span></label>
+              <label htmlFor="title">
+                タイトル<span className="required">※必須</span>
+              </label>
+              <p className="support">一覧で判断できる短い名前にします。</p>
               <input id="title" name="title" />
             </div>
             <div className="field">
-              <label htmlFor="body">本文<span className="required">※任意</span></label>
+              <label htmlFor="body">
+                本文<span className="required">※任意</span>
+              </label>
+              <p className="support">背景、判断理由、次にやることを必要な分だけ書きます。</p>
               <textarea id="body" name="body" />
             </div>
             <button className="button" type="submit">保存</button>

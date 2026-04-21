@@ -11,7 +11,7 @@ export default async function CapturePage() {
       <header className="page-header">
         <p className="eyebrow">Quick Capture</p>
         <h1>クイック登録</h1>
-        <p className="support">スマホでは本文入力を主にします。repo 未選択なら未整理メモとして保存できます。</p>
+        <p className="support">本文だけで保存できます。Repository 未選択なら未整理メモとしてローカル DB に保存します。</p>
       </header>
       <section className="panel">
         <form action={quickCapture} className="form-stack">
@@ -63,9 +63,12 @@ export default async function CapturePage() {
               <option value="chatgpt">chatgpt paste</option>
             </select>
           </div>
-          <label>
-            <input name="isPinned" type="checkbox" /> 今やる候補として固定する
-          </label>
+          <div className="field">
+            <label>
+              <input name="isPinned" type="checkbox" /> 今やる候補として固定する
+            </label>
+            <p className="support">固定すると Dashboard の Now で優先して見えます。</p>
+          </div>
           <button className="button" type="submit">保存</button>
         </form>
       </section>
