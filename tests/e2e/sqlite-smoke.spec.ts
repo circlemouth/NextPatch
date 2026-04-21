@@ -47,9 +47,10 @@ test("SQLite local smoke: dashboard, CRUD-ish flows, memo classification, and ex
 
   await gotoAndAssertHealthy(page, guards, "/inbox", "inbox");
   await expect(page.getByRole("heading", { name: `QA memo ${suffix}` })).toBeVisible();
-  await page.getByLabel(/分類先/).first().selectOption("task");
-  await page.getByLabel(/タイトル/).first().fill(`QA classified task ${suffix}`);
-  await page.getByRole("button", { name: "分類して作成" }).first().click();
+  const memoCard = page.locator("article").filter({ has: page.getByRole("heading", { name: `QA memo ${suffix}` }) });
+  await memoCard.getByLabel(/分類先/).selectOption("task");
+  await memoCard.getByLabel(/タイトル/).fill(`QA classified task ${suffix}`);
+  await memoCard.getByRole("button", { name: "分類して作成" }).click();
   await guards.assertHealthy("memo classification");
 
   await gotoAndAssertHealthy(page, guards, "/work-items", "work items after classification");
