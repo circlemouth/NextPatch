@@ -39,8 +39,8 @@ export default async function AppLayout({
         <div className="main-area">
           <header className="topbar">
             <div>
-              <strong>ローカル運用</strong>
-              <p className="support">Workspace: {workspace.name}</p>
+              <strong>LAN内運用</strong>
+              <p className="support">ログイン中: {workspace.name}</p>
             </div>
             <div className="button-row">
               <Link className="button" href="/capture/new">

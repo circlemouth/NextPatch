@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { loginAction } from "@/server/auth/actions";
 import { getAuthConfig } from "@/server/auth/config";
@@ -9,8 +8,14 @@ import { getAuthenticatedLocalContext } from "@/server/auth/session";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Login | NextPatch"
+  title: "ログイン | NextPatch"
 };
+
+const errorMessages = {
+  invalid: "＊パスワードが一致しません。管理者が設定したログインパスワードを入力してください。",
+  "missing-config":
+    "＊ログイン設定が不足しています。.env の NEXTPATCH_LOGIN_PASSWORD と NEXTPATCH_SESSION_SECRET を設定してから再起動してください。"
+} as const;
 
 type LoginPageProps = {
   searchParams?: Promise<{
@@ -25,60 +30,55 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   }
 
   const params = await searchParams;
-  const nextPath = sanitizeNextPath(Array.isArray(params?.next) ? params?.next[0] : params?.next);
-  const error = Array.isArray(params?.error) ? params?.error[0] : params?.error;
+  const nextPath = sanitizeNextPath(Array.isArray(params?.next) ? params.next[0] : params?.next);
+  const errorKey = Array.isArray(params?.error) ? params.error[0] : params?.error;
   const config = getAuthConfig();
+  const configError = config ? null : errorMessages["missing-config"];
+  const actionError = errorKey && errorKey in errorMessages ? errorMessages[errorKey as keyof typeof errorMessages] : null;
+  const errorMessage = configError ?? actionError;
+  const supportId = "login-password-support";
+  const errorId = errorMessage ? "login-password-error" : undefined;
+  const describedBy = [supportId, errorId].filter(Boolean).join(" ");
 
   return (
     <main className="auth-page">
-      <div className="auth-box">
-        <header className="page-header">
-          <p className="eyebrow">Login</p>
-          <h1>NextPatch にサインイン</h1>
-          <p className="support">単一ユーザー向けのローカル認証です。保存先は HttpOnly cookie です。</p>
-        </header>
+      <section className="auth-box panel auth-card" aria-labelledby="login-title">
+        <div className="auth-hero">
+          <p className="eyebrow">NextPatch</p>
+          <h1 id="login-title">LAN内利用向けの簡易ログイン</h1>
+          <p className="support">信頼できるLAN内のNextPatchにアクセスするための共通パスワードを入力します。</p>
+        </div>
 
-        <section className="panel">
-          {!config ? (
-            <div className="banner banner--error" role="alert">
-              <strong>認証設定がありません</strong>
-              <p>
-                `NEXTPATCH_LOGIN_PASSWORD` と `NEXTPATCH_SESSION_SECRET` を設定するとログインが有効になります。
+        <form action={loginAction} className="form-stack auth-form">
+          <input name="next" type="hidden" value={nextPath} />
+          <div className="field">
+            <label htmlFor="password">
+              ログインパスワード <span className="required">※必須</span>
+            </label>
+            <p className="support" id={supportId}>
+              LAN内のNextPatchにアクセスするための共通パスワードを入力します。
+            </p>
+            <input
+              aria-describedby={describedBy || undefined}
+              autoComplete="current-password"
+              id="password"
+              name="password"
+              type="password"
+            />
+            {errorMessage ? (
+              <p className="error-text" id={errorId}>
+                {errorMessage}
               </p>
-            </div>
-          ) : null}
+            ) : null}
+          </div>
 
-          {error === "invalid" ? (
-            <div className="banner banner--error" role="alert">
-              <strong>パスワードが違います</strong>
-              <p>設定済みの `NEXTPATCH_LOGIN_PASSWORD` を入力してください。</p>
-            </div>
-          ) : null}
-
-          {error === "disabled" ? (
-            <div className="banner banner--error" role="alert">
-              <strong>ログインは無効です</strong>
-              <p>認証設定が未投入のため、セッションを発行できません。</p>
-            </div>
-          ) : null}
-
-          <form action={loginAction} className="form-stack">
-            <input name="next" type="hidden" value={nextPath} />
-            <div className="field">
-              <label htmlFor="password">Password</label>
-              <input id="password" name="password" type="password" autoComplete="current-password" required />
-            </div>
-            <div className="button-row">
-              <button className="button" type="submit">
-                ログイン
-              </button>
-              <Link className="button button--secondary" href="/dashboard">
-                Dashboard
-              </Link>
-            </div>
-          </form>
-        </section>
-      </div>
+          <div className="auth-actions">
+            <button className="button" type="submit">
+              ログイン
+            </button>
+          </div>
+        </form>
+      </section>
     </main>
   );
 }

@@ -12,7 +12,7 @@ export async function loginAction(formData: FormData) {
   const nextPath = sanitizeNextPath(formData.get("next")?.toString());
 
   if (!config) {
-    redirect(getLoginPath(nextPath, "disabled"));
+    redirect(getLoginPath(nextPath, "missing-config"));
   }
 
   const password = formData.get("password")?.toString() ?? "";
