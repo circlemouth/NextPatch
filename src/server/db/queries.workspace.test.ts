@@ -10,8 +10,9 @@ vi.mock("@/server/db/queries/context", () => ({
 }));
 
 import { LOCAL_USER_ID, PERSONAL_WORKSPACE_ID } from "@/server/auth/session";
-import { closeDatabaseConnection } from "@/server/db/client";
+import { closeDatabaseConnection, getSqlite } from "@/server/db/client";
 import { classifyMemoCommand } from "@/server/db/queries/classification";
+import { listDashboardWorkItems } from "@/server/db/queries/dashboard";
 import { createWorkItemCommand, updateWorkItemStatusCommand } from "@/server/db/queries/work-items";
 import { migrateDatabase } from "@/server/db/migrate";
 import { seedDatabase } from "@/server/db/seed";
@@ -49,6 +50,50 @@ function setup() {
 }
 
 describe("SQLite workspace guardrails", () => {
+  it("uses the provided workspace id when listing dashboard work items", async () => {
+    const ctx = setup();
+    const now = "2026-04-21T00:00:00.000Z";
+
+    getSqlite()
+      .prepare(
+        `insert into workspaces (id, owner_user_id, name, created_at, updated_at)
+         values (?, ?, ?, ?, ?)`
+      )
+      .run(ctx.otherWorkspaceId, ctx.userId, "Other workspace", now, now);
+
+    await createWorkItemCommand({
+      workspaceId: ctx.workspaceId,
+      userId: ctx.userId,
+      repositoryId: null,
+      scope: "global",
+      type: "task",
+      title: "Personal dashboard item",
+      status: "todo",
+      priority: "p2",
+      sourceType: "manual",
+      privacyLevel: "normal",
+      isPinned: false
+    });
+
+    const otherWorkspaceItemId = await createWorkItemCommand({
+      workspaceId: ctx.otherWorkspaceId,
+      userId: ctx.userId,
+      repositoryId: null,
+      scope: "global",
+      type: "task",
+      title: "Other dashboard item",
+      status: "todo",
+      priority: "p2",
+      sourceType: "manual",
+      privacyLevel: "normal",
+      isPinned: false
+    });
+
+    await expect(listDashboardWorkItems(ctx.otherWorkspaceId)).resolves.toEqual([
+      expect.objectContaining({ id: otherWorkspaceItemId, title: "Other dashboard item", workspace_id: ctx.otherWorkspaceId })
+    ]);
+  });
+
   it("rejects classification from another workspace", async () => {
     const ctx = setup();
     const memoId = await createWorkItemCommand({
