@@ -15,7 +15,7 @@ export default defineConfig({
   ],
   webServer: {
     command: "pnpm test:e2e:server",
-    url: "http://127.0.0.1:3000/dashboard",
+    url: "http://127.0.0.1:3000/login",
     reuseExistingServer: false,
     timeout: 120_000
   }
