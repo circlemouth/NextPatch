@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { applyStatusTimestamps, isClosed, isCompleted, isOnHold, isOpen } from "./status";
+import { applyStatusTimestamps, assertAllowedWorkItemStatus, isAllowedWorkItemStatus, isClosed, isCompleted, isOnHold, isOpen } from "./status";
 
 describe("status lifecycle", () => {
   it("separates completed and closed", () => {
@@ -50,5 +50,11 @@ describe("status lifecycle", () => {
         deleted_at: null
       })
     ).toBe(false);
+  });
+
+  it("validates statuses by work item type", () => {
+    expect(isAllowedWorkItemStatus("memo", "itemized")).toBe(true);
+    expect(isAllowedWorkItemStatus("task", "itemized")).toBe(false);
+    expect(() => assertAllowedWorkItemStatus("task", "resolved")).toThrow("Unsupported status for task: resolved");
   });
 });

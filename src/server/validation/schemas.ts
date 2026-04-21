@@ -34,7 +34,7 @@ export const quickCaptureSchema = z.object({
 
 export const classifyMemoSchema = z.object({
   memoId: z.string().uuid(),
-  targetType: z.enum(["task", "bug", "idea", "implementation", "future_feature", "memo"]),
+  targetType: z.enum(["task", "bug", "idea", "implementation", "future_feature"]),
   repositoryId: z.string().uuid().optional().or(z.literal("")),
   title: z.string().trim().min(1, "＊タイトルを入力してください。"),
   body: z.string().trim().optional(),

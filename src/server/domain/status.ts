@@ -20,6 +20,28 @@ const closedOnlyStatuses: Record<WorkItemType, string[]> = {
 
 const holdStatuses = new Set(["on_hold", "blocked"]);
 
+const allowedStatuses: Record<WorkItemType, readonly string[]> = {
+  task: ["todo", "doing", "blocked", "on_hold", "done", "canceled", "duplicate"],
+  bug: [
+    "unconfirmed",
+    "confirmed",
+    "doing",
+    "fixed_waiting",
+    "resolved",
+    "blocked",
+    "on_hold",
+    "cannot_reproduce",
+    "works_as_designed",
+    "not_planned",
+    "canceled",
+    "duplicate"
+  ],
+  idea: ["unreviewed", "in_review", "accepted", "promoted", "adopted", "rejected", "blocked", "on_hold", "duplicate"],
+  implementation: ["todo", "doing", "blocked", "on_hold", "done", "canceled", "duplicate"],
+  future_feature: ["todo", "doing", "blocked", "on_hold", "adopted", "promoted", "rejected", "canceled", "duplicate"],
+  memo: ["unreviewed", "itemized", "record_only", "discarded", "duplicate"]
+};
+
 export function isCompleted(type: WorkItemType, status: string) {
   return completedStatuses[type].includes(status);
 }
@@ -34,6 +56,16 @@ export function isOpen(item: Pick<WorkItemRow, "type" | "status" | "archived_at"
 
 export function isOnHold(status: string) {
   return holdStatuses.has(status);
+}
+
+export function isAllowedWorkItemStatus(type: WorkItemType, status: string) {
+  return allowedStatuses[type].includes(status);
+}
+
+export function assertAllowedWorkItemStatus(type: WorkItemType, status: string) {
+  if (!isAllowedWorkItemStatus(type, status)) {
+    throw new Error(`Unsupported status for ${type}: ${status}`);
+  }
 }
 
 export function applyStatusTimestamps(

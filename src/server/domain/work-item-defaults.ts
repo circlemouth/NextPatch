@@ -1,4 +1,6 @@
-export function defaultStatus(type: string) {
+import type { WorkItemType } from "@/server/types";
+
+export function defaultStatus(type: WorkItemType) {
   switch (type) {
     case "bug":
       return "unconfirmed";
