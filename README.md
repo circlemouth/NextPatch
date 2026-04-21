@@ -38,6 +38,15 @@ docker compose down
 
 Use `docker compose down` to stop the daily local server stack.
 
+## Schema and Migrations
+
+The SQLite migration source of truth is the hand-written SQL under `drizzle/*.sql`.
+Those files define the authoritative tables, constraints, and indexes, and the migration runner is responsible for recording applied steps in `nextpatch_migrations` history.
+
+`src/server/db/schema.ts` is used for Drizzle query typing and should stay aligned with the SQL, but it is not the canonical source for FK or CHECK constraints.
+
+Do not use `db:generate` for SQLite migrations. New schema changes should be written directly as SQL migrations and added to the migration history through the runner.
+
 ## Backup
 
 Use Settings > Data to create a JSON export. JSON export is the reversible backup format for restoring into a new workspace.

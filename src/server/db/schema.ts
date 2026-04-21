@@ -1,3 +1,5 @@
+// Query typing only. Authoritative constraints, indexes, and migration history
+// live in drizzle/*.sql, not in this schema definition.
 import { index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 
 export const localUsers = sqliteTable("local_users", {
