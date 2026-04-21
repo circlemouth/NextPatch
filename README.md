@@ -2,7 +2,7 @@
 
 NextPatch is a self-managed local server web app for organizing repository work, bugs, ideas, implementation notes, ChatGPT paste notes, and the next action to take.
 
-The MVP is private by default. There is no unauthenticated standard mode. GitHub integration is limited to URL parsing, and ChatGPT integration is limited to manual paste plus local JSON/Markdown parsing.
+The MVP is a local single-user build. It has no built-in access control, so it binds to localhost by default and should not be exposed on a LAN or the public internet without an external protection layer. GitHub integration is limited to URL parsing, and ChatGPT integration is limited to manual paste plus local JSON/Markdown parsing.
 
 ## Requirements
 
