@@ -15,10 +15,13 @@ The MVP is private by default. There is no unauthenticated standard mode. GitHub
 ```bash
 pnpm install
 cp .env.example .env.local
+pnpm db:migrate
+pnpm db:seed
 pnpm dev
 ```
 
 Open `http://localhost:3000`. The app uses a local single-user context during the SQLite migration.
+If you need a clean local database, run `pnpm db:reset:dev` first. It removes only the SQLite file plus `-wal` and `-shm` sidecars and respects `NEXTPATCH_DB_PATH` when set.
 
 ## Daily Local Server Startup
 
@@ -27,8 +30,8 @@ cp .env.example .env
 docker compose up -d
 ```
 
-The compose file starts the NextPatch web container and mounts the SQLite data volume at `/app/data`.
-Use this path when you want the app running as a persistent local server.
+The compose file starts the NextPatch web container, runs database init on container start, and mounts the SQLite data volume at `/app/data`.
+It binds only to `127.0.0.1:3000` so the service stays on the local machine by default.
 
 ## Stop
 
@@ -57,9 +60,13 @@ The MVP does not merge into an existing workspace and does not restore from Mark
 ## Docker Build Note
 
 The SQLite implementation is expected to use `better-sqlite3`, which has a native addon.
-If the dependency is added while using the Alpine Docker image, the deps/builder stages must include the native build toolchain needed by `node-gyp` such as Python, make, and a C++ compiler, or the image should move to a Debian-based Node image.
+If the dependency is added while using the Alpine Docker image, the deps stage must include the native build toolchain needed by `node-gyp` such as Python, make, and a C++ compiler, or the image should move to a Debian-based Node image.
+
+## Fresh Start
+
+For a clean local restart, stop the app, remove the SQLite database with `pnpm db:reset:dev`, then rerun migrations and seed. In Docker, `docker compose down -v` also removes the data volume if you want to discard persistent state completely.
 
 ## External Exposure
 
 External publication is not recommended for the MVP.
-If you expose it outside a trusted LAN, use HTTPS, an explicit access-control layer, regular JSON exports, DB volume backups, and firewall rules.
+If you expose it outside a trusted LAN, use HTTPS, an explicit access-control layer, regular JSON exports, DB volume backups, and firewall rules. The default compose port binding is local-only; change it explicitly if you intend to publish the service on your LAN.

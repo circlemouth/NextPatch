@@ -16,17 +16,29 @@ afterEach(() => {
   cleanup = undefined;
 });
 
-function createTempDbPath() {
+function createTempSandbox() {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "nextpatch-sqlite-"));
   cleanup = () => fs.rmSync(tempDir, { recursive: true, force: true });
-  return path.join(tempDir, "nextpatch.test.sqlite");
+  return {
+    dbPath: path.join(tempDir, "nextpatch.test.sqlite"),
+    migrationDir: path.join(tempDir, "drizzle")
+  };
+}
+
+function copyInitialMigration(migrationDir: string) {
+  fs.mkdirSync(migrationDir, { recursive: true });
+  fs.copyFileSync(
+    path.resolve("drizzle/0000_initial_sqlite.sql"),
+    path.join(migrationDir, "0000_initial_sqlite.sql")
+  );
 }
 
 describe("SQLite migration and seed", () => {
   it("creates the local user, personal workspace, and owner membership", () => {
-    const dbPath = createTempDbPath();
+    const { dbPath, migrationDir } = createTempSandbox();
+    copyInitialMigration(migrationDir);
 
-    migrateDatabase(dbPath);
+    migrateDatabase(dbPath, migrationDir);
     seedDatabase(dbPath);
 
     const sqlite = new Database(dbPath);
@@ -52,19 +64,39 @@ describe("SQLite migration and seed", () => {
   });
 
   it("runs migration and seed idempotently", () => {
-    const dbPath = createTempDbPath();
+    const { dbPath, migrationDir } = createTempSandbox();
+    copyInitialMigration(migrationDir);
 
-    migrateDatabase(dbPath);
+    migrateDatabase(dbPath, migrationDir);
     seedDatabase(dbPath);
-    migrateDatabase(dbPath);
+    migrateDatabase(dbPath, migrationDir);
     seedDatabase(dbPath);
 
     const sqlite = new Database(dbPath);
     try {
       const count = sqlite.prepare("select count(*) as count from workspace_members").get() as { count: number };
       expect(count.count).toBe(1);
+      const migrations = sqlite
+        .prepare("select id, checksum, applied_at from nextpatch_migrations order by id")
+        .all() as Array<{ id: string; checksum: string; applied_at: string }>;
+
+      expect(migrations).toHaveLength(1);
+      expect(migrations[0].id).toBe("0000_initial_sqlite.sql");
+      expect(migrations[0].checksum).toHaveLength(64);
+      expect(migrations[0].applied_at).toMatch(/^\d{4}-\d{2}-\d{2}T/);
     } finally {
       sqlite.close();
     }
+  });
+
+  it("fails when an applied migration checksum changes", () => {
+    const { dbPath, migrationDir } = createTempSandbox();
+    copyInitialMigration(migrationDir);
+
+    migrateDatabase(dbPath, migrationDir);
+
+    fs.appendFileSync(path.join(migrationDir, "0000_initial_sqlite.sql"), "\n-- checksum drift");
+
+    expect(() => migrateDatabase(dbPath, migrationDir)).toThrow(/Migration checksum changed/);
   });
 });

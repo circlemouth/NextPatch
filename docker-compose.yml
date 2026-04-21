@@ -13,7 +13,7 @@ services:
       NEXTPATCH_DB_PATH: /app/data/nextpatch.sqlite
       NEXTPATCH_EXPORT_DIR: /app/data/exports
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
     volumes:
       - nextpatch_data:/app/data
     restart: unless-stopped
