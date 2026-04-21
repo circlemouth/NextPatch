@@ -15,6 +15,8 @@ process.env.NEXTPATCH_DATA_DIR = tempDir;
 process.env.NEXTPATCH_DB_PATH = dbPath;
 process.env.NEXTPATCH_EXPORT_DIR = exportDir;
 process.env.NEXTPATCH_RUNTIME_MODE = "e2e";
+process.env.NEXTPATCH_LOGIN_PASSWORD = process.env.NEXTPATCH_LOGIN_PASSWORD ?? "e2e-password";
+process.env.NEXTPATCH_SESSION_SECRET = process.env.NEXTPATCH_SESSION_SECRET ?? "e2e-session-secret";
 
 try {
   migrateDatabase(dbPath);
@@ -24,7 +26,7 @@ try {
   throw error;
 }
 
-const child = spawn("pnpm", ["dev"], {
+const child = spawn("pnpm", ["exec", "next", "dev", "--hostname", "0.0.0.0"], {
   env: process.env,
   stdio: "inherit"
 });

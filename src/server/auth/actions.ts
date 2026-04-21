@@ -4,8 +4,8 @@ import crypto from "node:crypto";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { getAuthConfig, SESSION_COOKIE_NAME } from "@/server/auth/config";
-import { createSessionToken } from "@/server/auth/session-token";
 import { getLoginPath, sanitizeNextPath } from "@/server/auth/redirects";
+import { createSessionToken } from "@/server/auth/session-token";
 
 export async function loginAction(formData: FormData) {
   const config = getAuthConfig();

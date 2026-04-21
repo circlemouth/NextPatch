@@ -6,10 +6,27 @@ test("SQLite local smoke: dashboard, CRUD-ish flows, memo classification, and ex
   const suffix = `${Date.now()}-${testInfo.project.name}`;
   const guards = installPageGuards(page);
 
-  await gotoAndAssertHealthy(page, guards, "/dashboard", "dashboard");
+  await gotoAndAssertHealthy(page, guards, "/dashboard", "dashboard redirect");
+  await expect(page).toHaveURL(/\/login\?next=%2Fdashboard$/);
+  await expect(page.getByRole("heading", { name: "LAN内利用向けの簡易ログイン" })).toBeVisible();
+  await assertNoExternalAuthPrompts(page);
+  await guards.assertHealthy("login page");
+
+  await page.getByLabel(/ログインパスワード/).fill("wrong-password");
+  await page.getByRole("button", { name: "ログイン" }).click();
+  await expect(page.getByText("＊パスワードが一致しません。管理者が設定したログインパスワードを入力してください。")).toBeVisible();
+  await expect(page).toHaveURL(/\/login\?next=%2Fdashboard&error=invalid$/);
+  await guards.assertHealthy("invalid login");
+
+  await page.getByLabel(/ログインパスワード/).fill("e2e-password");
+  await page.getByRole("button", { name: "ログイン" }).click();
   await expect(page).toHaveURL(/\/dashboard$/);
   await expect(page.getByRole("heading", { name: "今やるべきこと" })).toBeVisible();
-  await assertNoAuthPrompts(page);
+  await assertNoExternalAuthPrompts(page);
+  await guards.assertHealthy("authenticated dashboard");
+
+  await expect(page).toHaveURL(/\/dashboard$/);
+  await expect(page.getByRole("heading", { name: "今やるべきこと" })).toBeVisible();
   await guards.assertHealthy("dashboard");
 
   await page.getByRole("link", { name: "登録する" }).click();
@@ -118,10 +135,9 @@ async function assertExportRouteOk(page: Page, route: string) {
   expect(response.status(), `${route} returned HTTP ${response.status()}`).toBe(200);
 }
 
-async function assertNoAuthPrompts(page: Page) {
+async function assertNoExternalAuthPrompts(page: Page) {
   await expect(page.getByText(new RegExp(["Supa", "base"].join(""), "i"))).toHaveCount(0);
   await expect(page.getByText(new RegExp(["magic", "link"].join("\\s+"), "i"))).toHaveCount(0);
   await expect(page.getByText(new RegExp(["signIn", "With", "Otp"].join(""), "i"))).toHaveCount(0);
-  await expect(page.getByRole("link", { name: /login|ログイン/i })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: /login|ログイン/i })).toHaveCount(0);
+  await expect(page.getByText(/oauth/i)).toHaveCount(0);
 }
