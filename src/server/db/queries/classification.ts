@@ -6,6 +6,7 @@ import { defaultStatus } from "@/server/domain/work-item-defaults";
 import type { ImportCandidate, ImportParseResult } from "@/server/domain/import-parser";
 import type { PrivacyLevel, SourceType, WorkItemScope, WorkItemType } from "@/server/types";
 import { assertPersonalWorkspaceScope } from "./context";
+import { assertActiveRepositoryInWorkspace } from "./repositories";
 
 type QuickCaptureInput = {
   workspaceId: string;
@@ -34,6 +35,7 @@ type ClassifyMemoInput = {
 
 export async function quickCaptureCommand(input: QuickCaptureInput) {
   assertPersonalWorkspaceScope(input.workspaceId);
+  assertActiveRepositoryInWorkspace(input.workspaceId, input.repositoryId);
 
   const memoId = crypto.randomUUID();
   const now = new Date().toISOString();
@@ -75,6 +77,7 @@ export async function quickCaptureCommand(input: QuickCaptureInput) {
 
 export async function classifyMemoCommand(input: ClassifyMemoInput) {
   assertPersonalWorkspaceScope(input.workspaceId);
+  assertActiveRepositoryInWorkspace(input.workspaceId, input.repositoryId);
 
   const id = crypto.randomUUID();
   const now = new Date().toISOString();

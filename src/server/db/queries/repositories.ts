@@ -82,8 +82,38 @@ export async function getRepositoryById(workspaceId: string, id: string): Promis
   const row = getDb()
     .select()
     .from(repositories)
-    .where(and(eq(repositories.workspaceId, workspaceId), eq(repositories.id, id)))
+    .where(
+      and(
+        eq(repositories.workspaceId, workspaceId),
+        eq(repositories.id, id),
+        isNull(repositories.archivedAt),
+        isNull(repositories.deletedAt)
+      )
+    )
     .get();
 
   return row ? toRepositoryRow(row) : null;
+}
+
+export function assertActiveRepositoryInWorkspace(workspaceId: string, repositoryId: string | null) {
+  if (!repositoryId) {
+    return;
+  }
+
+  const row = getDb()
+    .select({ id: repositories.id })
+    .from(repositories)
+    .where(
+      and(
+        eq(repositories.workspaceId, workspaceId),
+        eq(repositories.id, repositoryId),
+        isNull(repositories.archivedAt),
+        isNull(repositories.deletedAt)
+      )
+    )
+    .get();
+
+  if (!row) {
+    throw new Error(`Active repository not found in workspace: ${repositoryId}`);
+  }
 }
