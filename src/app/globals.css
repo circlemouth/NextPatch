@@ -107,6 +107,7 @@ select {
 
 .topbar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-2);
@@ -388,10 +389,46 @@ th {
   place-items: center;
   min-height: 100svh;
   padding: var(--space-3);
+  background:
+    radial-gradient(circle at top left, rgba(29, 78, 216, 0.08), transparent 42%),
+    radial-gradient(circle at bottom right, rgba(109, 40, 217, 0.08), transparent 38%),
+    var(--color-bg);
 }
 
 .auth-box {
   width: min(560px, 100%);
+}
+
+.auth-card {
+  display: grid;
+  gap: var(--space-3);
+  padding: clamp(24px, 4vw, 40px);
+  border: 1px solid var(--color-border-soft);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.08);
+}
+
+.auth-hero {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.auth-hero h1 {
+  font-size: clamp(28px, 4vw, 38px);
+  line-height: 1.25;
+}
+
+.auth-form {
+  gap: var(--space-2);
+}
+
+.auth-actions {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.auth-actions .button {
+  width: 100%;
 }
 
 @media (max-width: 767px) {
@@ -459,5 +496,13 @@ th {
 
   .button {
     width: 100%;
+  }
+
+  .auth-page {
+    padding: var(--space-2);
+  }
+
+  .auth-card {
+    padding: var(--space-2);
   }
 }
