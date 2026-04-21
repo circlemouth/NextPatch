@@ -1,25 +1,11 @@
 import { classifyMemo } from "@/server/actions/classification";
-import { requireSession } from "@/server/auth/session";
-import type { RepositoryRow, WorkItemRow } from "@/server/types";
+import { requireLocalContext } from "@/server/auth/session";
+import { listRepositories } from "@/server/db/queries/repositories";
+import { listMemos } from "@/server/db/queries/work-items";
 
 export default async function InboxPage() {
-  const { supabase, workspace } = await requireSession();
-  const [{ data: memos, error: memosError }, { data: repositories, error: repositoriesError }] = await Promise.all([
-    supabase
-      .from("work_items")
-      .select("*")
-      .eq("workspace_id", workspace.id)
-      .eq("type", "memo")
-      .is("deleted_at", null)
-      .order("updated_at", { ascending: false }),
-    supabase.from("repositories").select("*").eq("workspace_id", workspace.id).is("deleted_at", null)
-  ]);
-
-  if (memosError) throw memosError;
-  if (repositoriesError) throw repositoriesError;
-
-  const memoItems = (memos ?? []) as WorkItemRow[];
-  const repoOptions = (repositories ?? []) as RepositoryRow[];
+  const { workspace } = await requireLocalContext();
+  const [memoItems, repoOptions] = await Promise.all([listMemos(workspace.id), listRepositories(workspace.id)]);
 
   return (
     <main className="page">
@@ -44,7 +30,10 @@ export default async function InboxPage() {
                 <form action={classifyMemo} className="form-stack">
                   <input type="hidden" name="memoId" value={memo.id} />
                   <div className="field">
-                    <label htmlFor={`targetType-${memo.id}`}>分類先<span className="required">※必須</span></label>
+                    <label htmlFor={`targetType-${memo.id}`}>
+                      分類先<span className="required">※必須</span>
+                    </label>
+                    <p className="support">作成する Work Item の種類を選びます。</p>
                     <select id={`targetType-${memo.id}`} name="targetType" defaultValue="task">
                       <option value="task">task</option>
                       <option value="bug">bug</option>
@@ -55,7 +44,10 @@ export default async function InboxPage() {
                     </select>
                   </div>
                   <div className="field">
-                    <label htmlFor={`repo-${memo.id}`}>Repository<span className="required">※任意</span></label>
+                    <label htmlFor={`repo-${memo.id}`}>
+                      Repository<span className="required">※任意</span>
+                    </label>
+                    <p className="support">分類先が特定リポジトリに属する場合だけ選びます。</p>
                     <select id={`repo-${memo.id}`} name="repositoryId" defaultValue="">
                       <option value="">未紐づけ</option>
                       {repoOptions.map((repository) => (
@@ -64,11 +56,17 @@ export default async function InboxPage() {
                     </select>
                   </div>
                   <div className="field">
-                    <label htmlFor={`title-${memo.id}`}>タイトル<span className="required">※必須</span></label>
+                    <label htmlFor={`title-${memo.id}`}>
+                      タイトル<span className="required">※必須</span>
+                    </label>
+                    <p className="support">分類後の一覧で判断できる名前にします。</p>
                     <input id={`title-${memo.id}`} name="title" defaultValue={memo.title} />
                   </div>
                   <div className="field">
-                    <label htmlFor={`body-${memo.id}`}>本文<span className="required">※任意</span></label>
+                    <label htmlFor={`body-${memo.id}`}>
+                      本文<span className="required">※任意</span>
+                    </label>
+                    <p className="support">元メモは残したまま、作業項目に必要な内容へ整えます。</p>
                     <textarea id={`body-${memo.id}`} name="body" defaultValue={memo.body ?? ""} />
                   </div>
                   <button className="button" type="submit">分類して作成</button>

@@ -1,15 +1,9 @@
-import { requireSession } from "@/server/auth/session";
+import { requireLocalContext } from "@/server/auth/session";
+import { listReferenceServices } from "@/server/db/queries/auxiliary";
 
 export default async function ReferencesPage() {
-  const { supabase, workspace } = await requireSession();
-  const { data, error } = await supabase
-    .from("reference_services")
-    .select("*")
-    .eq("workspace_id", workspace.id)
-    .is("deleted_at", null)
-    .order("updated_at", { ascending: false });
-
-  if (error) throw error;
+  const { workspace } = await requireLocalContext();
+  const services = await listReferenceServices(workspace.id);
 
   return (
     <main className="page">
@@ -18,7 +12,19 @@ export default async function ReferencesPage() {
         <h1>参考サービス</h1>
       </header>
       <section className="panel">
-        {(data ?? []).length === 0 ? <p className="support">参考サービスはまだありません。</p> : null}
+        {services.length === 0 ? (
+          <p className="support">参考サービスはまだありません。</p>
+        ) : (
+          <div className="card-list">
+            {services.map((service) => (
+              <article className="item-card" key={service.id}>
+                <h2>{service.name}</h2>
+                {service.reference_point ? <p>{service.reference_point}</p> : null}
+                {service.url ? <a href={service.url}>{service.url}</a> : null}
+              </article>
+            ))}
+          </div>
+        )}
       </section>
     </main>
   );

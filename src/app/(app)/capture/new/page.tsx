@@ -1,24 +1,17 @@
 import { quickCapture } from "@/server/actions/capture";
-import { requireSession } from "@/server/auth/session";
-import type { RepositoryRow } from "@/server/types";
+import { requireLocalContext } from "@/server/auth/session";
+import { listRepositories } from "@/server/db/queries/repositories";
 
 export default async function CapturePage() {
-  const { supabase, workspace } = await requireSession();
-  const { data, error } = await supabase
-    .from("repositories")
-    .select("*")
-    .eq("workspace_id", workspace.id)
-    .is("deleted_at", null)
-    .order("updated_at", { ascending: false });
-
-  if (error) throw error;
+  const { workspace } = await requireLocalContext();
+  const repositories = await listRepositories(workspace.id);
 
   return (
     <main className="page">
       <header className="page-header">
         <p className="eyebrow">Quick Capture</p>
         <h1>クイック登録</h1>
-        <p className="support">スマホでは本文入力を主にします。repo 未選択なら未整理メモとして保存できます。</p>
+        <p className="support">本文だけで保存できます。Repository 未選択なら未整理メモとしてローカル DB に保存します。</p>
       </header>
       <section className="panel">
         <form action={quickCapture} className="form-stack">
@@ -31,7 +24,7 @@ export default async function CapturePage() {
             <label htmlFor="repositoryId">Repository<span className="required">※任意</span></label>
             <select id="repositoryId" name="repositoryId" defaultValue="">
               <option value="">未確定</option>
-              {((data ?? []) as RepositoryRow[]).map((repository) => (
+              {repositories.map((repository) => (
                 <option value={repository.id} key={repository.id}>{repository.name}</option>
               ))}
             </select>
@@ -70,9 +63,12 @@ export default async function CapturePage() {
               <option value="chatgpt">chatgpt paste</option>
             </select>
           </div>
-          <label>
-            <input name="isPinned" type="checkbox" /> 今やる候補として固定する
-          </label>
+          <div className="field">
+            <label>
+              <input name="isPinned" type="checkbox" /> 今やる候補として固定する
+            </label>
+            <p className="support">固定すると Dashboard の Now で優先して見えます。</p>
+          </div>
           <button className="button" type="submit">保存</button>
         </form>
       </section>

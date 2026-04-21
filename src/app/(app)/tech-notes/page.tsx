@@ -1,15 +1,9 @@
-import { requireSession } from "@/server/auth/session";
+import { requireLocalContext } from "@/server/auth/session";
+import { listTechNotes } from "@/server/db/queries/auxiliary";
 
 export default async function TechNotesPage() {
-  const { supabase, workspace } = await requireSession();
-  const { data, error } = await supabase
-    .from("tech_notes")
-    .select("*")
-    .eq("workspace_id", workspace.id)
-    .is("deleted_at", null)
-    .order("updated_at", { ascending: false });
-
-  if (error) throw error;
+  const { workspace } = await requireLocalContext();
+  const notes = await listTechNotes(workspace.id);
 
   return (
     <main className="page">
@@ -18,7 +12,22 @@ export default async function TechNotesPage() {
         <h1>技術メモ</h1>
       </header>
       <section className="panel">
-        {(data ?? []).length === 0 ? <p className="support">技術メモはまだありません。</p> : null}
+        {notes.length === 0 ? (
+          <p className="support">技術メモはまだありません。</p>
+        ) : (
+          <div className="card-list">
+            {notes.map((note) => (
+              <article className="item-card" key={note.id}>
+                <h2>{note.name}</h2>
+                <div className="meta-row">
+                  <span className="badge">{note.adoption_status}</span>
+                  {note.category ? <span className="badge">{note.category}</span> : null}
+                </div>
+                {note.reason ? <p>{note.reason}</p> : null}
+              </article>
+            ))}
+          </div>
+        )}
       </section>
     </main>
   );

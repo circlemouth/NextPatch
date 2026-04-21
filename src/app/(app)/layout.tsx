@@ -1,5 +1,4 @@
-import { logout } from "@/server/actions/auth";
-import { requireSession } from "@/server/auth/session";
+import { requireLocalContext } from "@/server/auth/session";
 import Link from "next/link";
 
 const navItems = [
@@ -14,12 +13,14 @@ const navItems = [
   ["Settings", "/settings"]
 ] as const;
 
+export const dynamic = "force-dynamic";
+
 export default async function AppLayout({
   children
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const { user } = await requireSession();
+  const { workspace } = await requireLocalContext();
 
   return (
     <div className="app-shell">
@@ -37,18 +38,13 @@ export default async function AppLayout({
         <div className="main-area">
           <header className="topbar">
             <div>
-              <strong>NextPatch</strong>
-              <p className="support">ログイン中: {user.email ?? user.id}</p>
+              <strong>ローカル運用</strong>
+              <p className="support">Workspace: {workspace.name}</p>
             </div>
             <div className="button-row">
               <Link className="button" href="/capture/new">
                 Quick Capture
               </Link>
-              <form action={logout}>
-                <button className="button button--secondary" type="submit">
-                  Logout
-                </button>
-              </form>
             </div>
           </header>
           {children}

@@ -1,34 +1,24 @@
 import { createWorkItem, updateWorkItemStatus } from "@/server/actions/work-items";
-import { requireSession } from "@/server/auth/session";
-import type { RepositoryRow, WorkItemRow } from "@/server/types";
+import { requireLocalContext } from "@/server/auth/session";
+import { listRepositories } from "@/server/db/queries/repositories";
+import { listWorkItems } from "@/server/db/queries/work-items";
 
 export default async function WorkItemsPage() {
-  const { supabase, workspace } = await requireSession();
-  const [{ data: items, error: itemsError }, { data: repositories, error: repositoriesError }] = await Promise.all([
-    supabase
-      .from("work_items")
-      .select("*, repositories(name)")
-      .eq("workspace_id", workspace.id)
-      .is("deleted_at", null)
-      .order("updated_at", { ascending: false }),
-    supabase.from("repositories").select("*").eq("workspace_id", workspace.id).is("deleted_at", null)
-  ]);
-
-  if (itemsError) throw itemsError;
-  if (repositoriesError) throw repositoriesError;
+  const { workspace } = await requireLocalContext();
+  const [items, repositories] = await Promise.all([listWorkItems(workspace.id), listRepositories(workspace.id)]);
 
   return (
     <main className="page">
       <header className="page-header">
         <p className="eyebrow">Work Items</p>
         <h1>横断 WorkItem</h1>
-        <p className="support">repositoryId が null の未整理・横断項目も表示します。</p>
+        <p className="support">リポジトリ未紐づけのメモや横断項目もローカル DB から表示します。</p>
       </header>
       <div className="grid-8-4">
         <section className="panel">
           <h2>一覧</h2>
           <div className="card-list">
-            {((items ?? []) as WorkItemRow[]).map((item) => (
+            {items.map((item) => (
               <article className="item-card" key={item.id}>
                 <h3>{item.title}</h3>
                 <div className="meta-row">
@@ -53,16 +43,22 @@ export default async function WorkItemsPage() {
           <h2>新規作成</h2>
           <form action={createWorkItem} className="form-stack">
             <div className="field">
-              <label htmlFor="repositoryId">Repository<span className="required">※任意</span></label>
+              <label htmlFor="repositoryId">
+                Repository<span className="required">※任意</span>
+              </label>
+              <p className="support">特定のリポジトリに紐づく作業だけ選択します。</p>
               <select id="repositoryId" name="repositoryId" defaultValue="">
                 <option value="">未紐づけ</option>
-                {((repositories ?? []) as RepositoryRow[]).map((repository) => (
+                {repositories.map((repository) => (
                   <option value={repository.id} key={repository.id}>{repository.name}</option>
                 ))}
               </select>
             </div>
             <div className="field">
-              <label htmlFor="type">種類<span className="required">※必須</span></label>
+              <label htmlFor="type">
+                種類<span className="required">※必須</span>
+              </label>
+              <p className="support">迷う場合は task を選びます。</p>
               <select id="type" name="type" defaultValue="task">
                 <option value="task">task</option>
                 <option value="bug">bug</option>
@@ -73,11 +69,17 @@ export default async function WorkItemsPage() {
               </select>
             </div>
             <div className="field">
-              <label htmlFor="title">タイトル<span className="required">※必須</span></label>
+              <label htmlFor="title">
+                タイトル<span className="required">※必須</span>
+              </label>
+              <p className="support">一覧で判断できる短い名前にします。</p>
               <input id="title" name="title" />
             </div>
             <div className="field">
-              <label htmlFor="body">本文<span className="required">※任意</span></label>
+              <label htmlFor="body">
+                本文<span className="required">※任意</span>
+              </label>
+              <p className="support">背景、判断理由、次にやることを必要な分だけ書きます。</p>
               <textarea id="body" name="body" />
             </div>
             <button className="button" type="submit">保存</button>

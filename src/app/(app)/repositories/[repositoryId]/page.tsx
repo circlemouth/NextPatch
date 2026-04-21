@@ -1,6 +1,6 @@
 import { createWorkItem, updateWorkItemStatus } from "@/server/actions/work-items";
-import { requireSession } from "@/server/auth/session";
-import type { RepositoryRow, WorkItemRow } from "@/server/types";
+import { requireLocalContext } from "@/server/auth/session";
+import { getRepositoryDetail } from "@/server/db/queries/repositories";
 
 type RepositoryDetailPageProps = {
   params: Promise<{ repositoryId: string }>;
@@ -8,27 +8,8 @@ type RepositoryDetailPageProps = {
 
 export default async function RepositoryDetailPage({ params }: RepositoryDetailPageProps) {
   const { repositoryId } = await params;
-  const { supabase, workspace } = await requireSession();
-  const [{ data: repository, error: repositoryError }, { data: items, error: itemsError }] = await Promise.all([
-    supabase.from("repositories").select("*").eq("workspace_id", workspace.id).eq("id", repositoryId).single(),
-    supabase
-      .from("work_items")
-      .select("*")
-      .eq("workspace_id", workspace.id)
-      .eq("repository_id", repositoryId)
-      .is("deleted_at", null)
-      .order("updated_at", { ascending: false })
-  ]);
-
-  if (repositoryError) {
-    throw repositoryError;
-  }
-  if (itemsError) {
-    throw itemsError;
-  }
-
-  const repo = repository as RepositoryRow;
-  const workItems = (items ?? []) as WorkItemRow[];
+  const { workspace } = await requireLocalContext();
+  const { repository: repo, items: workItems } = await getRepositoryDetail(workspace.id, repositoryId);
 
   return (
     <main className="page">
@@ -65,11 +46,14 @@ export default async function RepositoryDetailPage({ params }: RepositoryDetailP
           </div>
         </section>
         <section className="panel">
-          <h2>WorkItem 追加</h2>
+          <h2>Work Item 追加</h2>
           <form action={createWorkItem} className="form-stack">
             <input type="hidden" name="repositoryId" value={repositoryId} />
             <div className="field">
-              <label htmlFor="type">種類<span className="required">※必須</span></label>
+              <label htmlFor="type">
+                種類<span className="required">※必須</span>
+              </label>
+              <p className="support">迷う場合は task を選び、あとで分類し直します。</p>
               <select id="type" name="type" defaultValue="task">
                 <option value="task">task</option>
                 <option value="bug">bug</option>
@@ -80,11 +64,17 @@ export default async function RepositoryDetailPage({ params }: RepositoryDetailP
               </select>
             </div>
             <div className="field">
-              <label htmlFor="title">タイトル<span className="required">※必須</span></label>
+              <label htmlFor="title">
+                タイトル<span className="required">※必須</span>
+              </label>
+              <p className="support">一覧で判断できる短い名前にします。</p>
               <input id="title" name="title" />
             </div>
             <div className="field">
-              <label htmlFor="body">本文<span className="required">※任意</span></label>
+              <label htmlFor="body">
+                本文<span className="required">※任意</span>
+              </label>
+              <p className="support">再現手順、判断理由、次にやることを必要な分だけ書きます。</p>
               <textarea id="body" name="body" />
             </div>
             <button className="button" type="submit">保存</button>
