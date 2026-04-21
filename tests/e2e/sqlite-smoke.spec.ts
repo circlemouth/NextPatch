@@ -9,6 +9,7 @@ test("SQLite local smoke: dashboard, CRUD-ish flows, memo classification, and ex
   await gotoAndAssertHealthy(page, guards, "/dashboard", "dashboard");
   await expect(page).toHaveURL(/\/dashboard$/);
   await expect(page.getByRole("heading", { name: "今やるべきこと" })).toBeVisible();
+  await assertNoAuthPrompts(page);
   await guards.assertHealthy("dashboard");
 
   await page.getByRole("link", { name: "登録する" }).click();
@@ -61,6 +62,9 @@ test("SQLite local smoke: dashboard, CRUD-ish flows, memo classification, and ex
   await expect(page.getByRole("link", { name: "JSON export" })).toHaveAttribute("href", "/api/export/json");
   await expect(page.getByRole("link", { name: "Markdown export" })).toHaveAttribute("href", "/api/export/markdown");
   await expect(page.getByRole("link", { name: "CSV export" })).toHaveAttribute("href", "/api/export/csv");
+  await assertExportRouteOk(page, "/api/export/json");
+  await assertExportRouteOk(page, "/api/export/markdown");
+  await assertExportRouteOk(page, "/api/export/csv");
   await guards.assertHealthy("export links");
 });
 
@@ -103,4 +107,17 @@ async function gotoAndAssertHealthy(page: Page, guards: ReturnType<typeof instal
   expect(response, `${context} did not return an HTTP response`).not.toBeNull();
   expect(response?.status(), `${context} returned HTTP ${response?.status() ?? "unknown"}`).toBeLessThan(500);
   await guards.assertHealthy(context);
+}
+
+async function assertExportRouteOk(page: Page, route: string) {
+  const response = await page.request.get(route);
+  expect(response.status(), `${route} returned HTTP ${response.status()}`).toBe(200);
+}
+
+async function assertNoAuthPrompts(page: Page) {
+  await expect(page.getByText(new RegExp(["Supa", "base"].join(""), "i"))).toHaveCount(0);
+  await expect(page.getByText(new RegExp(["magic", "link"].join("\\s+"), "i"))).toHaveCount(0);
+  await expect(page.getByText(new RegExp(["signIn", "With", "Otp"].join(""), "i"))).toHaveCount(0);
+  await expect(page.getByRole("link", { name: /login|ログイン/i })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /login|ログイン/i })).toHaveCount(0);
 }
