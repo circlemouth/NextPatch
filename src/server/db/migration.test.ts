@@ -1,6 +1,7 @@
 // @vitest-environment node
 
 import Database from "better-sqlite3";
+import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -98,5 +99,53 @@ describe("SQLite migration and seed", () => {
     fs.appendFileSync(path.join(migrationDir, "0000_initial_sqlite.sql"), "\n-- checksum drift");
 
     expect(() => migrateDatabase(dbPath, migrationDir)).toThrow(/Migration checksum changed/);
+  });
+
+  it("fails when an applied migration file is missing", () => {
+    const { dbPath, migrationDir } = createTempSandbox();
+    copyInitialMigration(migrationDir);
+
+    migrateDatabase(dbPath, migrationDir);
+    fs.rmSync(path.join(migrationDir, "0000_initial_sqlite.sql"));
+
+    expect(() => migrateDatabase(dbPath, migrationDir)).toThrow(
+      "Applied migration file is missing: 0000_initial_sqlite.sql"
+    );
+  });
+
+  it("respects NEXTPATCH_DATA_DIR in database init and reset scripts", () => {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "nextpatch-script-paths-"));
+    cleanup = () => fs.rmSync(tempDir, { recursive: true, force: true });
+    const dataDir = path.join(tempDir, "review-data-dir");
+    const dbPath = path.join(dataDir, "nextpatch.sqlite");
+    const scriptEnv: NodeJS.ProcessEnv = {
+      ...process.env,
+      NEXTPATCH_DATA_DIR: dataDir
+    };
+    delete scriptEnv.NEXTPATCH_DB_PATH;
+
+    execFileSync(process.execPath, [path.resolve("scripts/db-init.mjs")], {
+      cwd: process.cwd(),
+      env: scriptEnv,
+      stdio: "pipe"
+    });
+
+    expect(fs.existsSync(dbPath)).toBe(true);
+
+    fs.writeFileSync(`${dbPath}-wal`, "");
+    fs.writeFileSync(`${dbPath}-shm`, "");
+    const unrelatedPath = path.join(dataDir, "keep.txt");
+    fs.writeFileSync(unrelatedPath, "keep");
+
+    execFileSync(process.execPath, [path.resolve("scripts/reset-dev-db.mjs")], {
+      cwd: process.cwd(),
+      env: scriptEnv,
+      stdio: "pipe"
+    });
+
+    expect(fs.existsSync(dbPath)).toBe(false);
+    expect(fs.existsSync(`${dbPath}-wal`)).toBe(false);
+    expect(fs.existsSync(`${dbPath}-shm`)).toBe(false);
+    expect(fs.readFileSync(unrelatedPath, "utf8")).toBe("keep");
   });
 });

@@ -49,7 +49,7 @@ Those files define the authoritative tables, constraints, and indexes, and the m
 
 `src/server/db/schema.ts` is used for Drizzle query typing and should stay aligned with the SQL, but it is not the canonical source for FK or CHECK constraints.
 
-Do not use `db:generate` for SQLite migrations. New schema changes should be written directly as SQL migrations and added to the migration history through the runner.
+Do not use `db:generate` for SQLite migrations; the project does not keep `drizzle-kit` as a dev dependency. New schema changes should be written directly as SQL migrations and added to the migration history through the runner.
 
 ## Backup
 
