@@ -1,5 +1,5 @@
 import { requireSession } from "@/server/auth/session";
-import type { WorkItemRow } from "@/server/types";
+import { getWorkItem } from "@/server/db/queries/context";
 
 type WorkItemDetailPageProps = {
   params: Promise<{ workItemId: string }>;
@@ -7,16 +7,8 @@ type WorkItemDetailPageProps = {
 
 export default async function WorkItemDetailPage({ params }: WorkItemDetailPageProps) {
   const { workItemId } = await params;
-  const { supabase, workspace } = await requireSession();
-  const { data, error } = await supabase
-    .from("work_items")
-    .select("*, repositories(name)")
-    .eq("workspace_id", workspace.id)
-    .eq("id", workItemId)
-    .single();
-
-  if (error) throw error;
-  const item = data as WorkItemRow;
+  const { workspace } = await requireSession();
+  const item = getWorkItem(workspace.id, workItemId);
 
   return (
     <main className="page">

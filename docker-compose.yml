@@ -9,21 +9,4 @@ services:
       PORT: 3000
     ports:
       - "3000:3000"
-    depends_on:
-      - nextpatch-db
     restart: unless-stopped
-
-  nextpatch-db:
-    image: postgres:16-alpine
-    environment:
-      POSTGRES_DB: nextpatch
-      POSTGRES_USER: nextpatch
-      POSTGRES_PASSWORD: nextpatch_local_password
-    volumes:
-      - nextpatch_pg_data:/var/lib/postgresql/data
-    ports:
-      - "54322:5432"
-    restart: unless-stopped
-
-volumes:
-  nextpatch_pg_data:

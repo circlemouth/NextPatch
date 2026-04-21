@@ -1,22 +1,11 @@
 import { createRepository } from "@/server/actions/repositories";
 import { requireSession } from "@/server/auth/session";
-import type { RepositoryRow } from "@/server/types";
+import { listRepositories } from "@/server/db/queries/context";
 import Link from "next/link";
 
 export default async function RepositoriesPage() {
-  const { supabase, workspace } = await requireSession();
-  const { data, error } = await supabase
-    .from("repositories")
-    .select("*")
-    .eq("workspace_id", workspace.id)
-    .is("deleted_at", null)
-    .order("updated_at", { ascending: false });
-
-  if (error) {
-    throw error;
-  }
-
-  const repositories = (data ?? []) as RepositoryRow[];
+  const { workspace } = await requireSession();
+  const repositories = listRepositories(workspace.id);
 
   return (
     <main className="page">
