@@ -39,8 +39,8 @@
 
 ## Final Artifacts
 
-- [ ] `docs/auth-lan-access/auth-lan-access.patch` created with `git diff --binary`.
-- [ ] `nextpatch-auth-lan-access-implementation.zip` created at repo root.
-- [ ] Zip excludes generated, database, and bulky runtime artifacts.
-- [ ] `unzip -l` output inspected.
+- [x] `docs/auth-lan-access/auth-lan-access.patch` created with `git diff --binary`.
+- [x] `nextpatch-auth-lan-access-implementation.zip` created at repo root.
+- [x] Zip excludes generated, database, and bulky runtime artifacts.
+- [x] `unzip -l` output inspected.
 - [x] Final verification results recorded.

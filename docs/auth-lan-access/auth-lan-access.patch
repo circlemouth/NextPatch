@@ -1,0 +1,1412 @@
+diff --git a/.env.example b/.env.example
+index d99d89c..5faaf88 100644
+--- a/.env.example
++++ b/.env.example
+@@ -1,7 +1,13 @@
+ # NextPatch local server environment template.
+ 
+ NEXT_PUBLIC_APP_URL=http://localhost:3000
++NEXTPATCH_BIND_HOST=0.0.0.0
++NEXTPATCH_HOST_PORT=3000
+ NEXTPATCH_RUNTIME_MODE=local-server
+ NEXTPATCH_DATA_DIR=./data
+ NEXTPATCH_DB_PATH=./data/nextpatch.sqlite
+ NEXTPATCH_EXPORT_DIR=./data/exports
++NEXTPATCH_LOGIN_PASSWORD=
++NEXTPATCH_SESSION_SECRET=
++NEXTPATCH_SESSION_MAX_AGE_SECONDS=604800
++NEXTPATCH_COOKIE_SECURE=false
+diff --git a/Dockerfile b/Dockerfile
+index 60a244f..282dfb6 100644
+--- a/Dockerfile
++++ b/Dockerfile
+@@ -18,6 +18,7 @@ FROM node:22-alpine AS runner
+ WORKDIR /app
+ ENV NODE_ENV=production
+ ENV PORT=3000
++ENV HOSTNAME=0.0.0.0
+ RUN addgroup --system --gid 1001 nodejs \
+   && adduser --system --uid 1001 nextjs \
+   && mkdir -p /app/data \
+diff --git a/README.md b/README.md
+index 32fa801..d83525f 100644
+--- a/README.md
++++ b/README.md
+@@ -1,14 +1,14 @@
+ # NextPatch
+ 
+-NextPatch is a self-managed local server web app for organizing repository work, bugs, ideas, implementation notes, ChatGPT paste notes, and the next action to take.
++NextPatch は、リポジトリ作業、バグ、アイデア、実装メモ、ChatGPT の貼り付けメモ、次に取るべきアクションを整理するための、自己管理型のローカルサーバー Web アプリです。
+ 
+-The MVP is a local single-user build. It has no built-in access control, so it binds to localhost by default and should not be exposed on a LAN or the public internet without an external protection layer. GitHub integration is limited to URL parsing, and ChatGPT integration is limited to manual paste plus local JSON/Markdown parsing.
++MVP はローカル単一ユーザー向け実装です。信頼できる LAN 内で利用するための共通パスワードログインと署名付き HttpOnly Cookie セッションを備えていますが、インターネット公開、SSO、多人数管理、パスワードリセット、HTTPS 終端は対象外です。GitHub 連携は URL 解析に限定され、ChatGPT 連携は手動貼り付けとローカルの JSON / Markdown 解析に限定されます。
+ 
+ ## Requirements
+ 
+ - Node.js 22
+ - pnpm 10
+-- Docker Desktop or Docker Engine
++- Docker Desktop または Docker Engine
+ 
+ ## Development Startup
+ 
+@@ -20,19 +20,31 @@ pnpm db:seed
+ pnpm dev
+ ```
+ 
+-Open `http://localhost:3000`. The app uses a local single-user context during the SQLite migration.
+-If you need a clean local database, run `pnpm db:reset:dev` first. It removes only the SQLite file plus `-wal` and `-shm` sidecars and respects `NEXTPATCH_DB_PATH` when set.
++`.env.local` に `NEXTPATCH_LOGIN_PASSWORD` と `NEXTPATCH_SESSION_SECRET` を設定してから `http://localhost:3000/login` を開いてください。
++セッションシークレットは次のコマンドで生成できます。
++
++```bash
++node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"
++```
++
++LAN から開発サーバーにアクセスする確認が必要な場合は、`pnpm dev:lan` を使い、別端末から `http://<ホスト端末のLAN IP>:3000/login` を開きます。
++ローカル DB を初期化したい場合は、先に `pnpm db:reset:dev` を実行してください。SQLite ファイル本体と `-wal` / `-shm` の付随ファイルだけを削除し、`NEXTPATCH_DB_PATH` が設定されていればそれを尊重します。
+ 
+ ## Daily Local Server Startup
+ 
+ ```bash
+ cp .env.example .env
+-docker compose up -d
++node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"
++docker compose up -d --build
+ ```
+ 
+-The compose file starts the NextPatch web container, runs database init on container start, and mounts the SQLite data volume at `/app/data`.
+-It binds only to `127.0.0.1:3000` so the service stays on the local machine by default.
+-Use this path when you want the app running as a persistent local server.
++`.env` で `NEXTPATCH_LOGIN_PASSWORD` を利用者が決めた共通パスワードに設定し、生成した値を `NEXTPATCH_SESSION_SECRET` に設定してください。実パスワードや実シークレットは `.env.example` や Git 管理ファイルに書かないでください。
++
++この compose ファイルは NextPatch の Web コンテナを起動し、コンテナ起動時に DB 初期化を実行し、SQLite データボリュームを `/app/data` にマウントします。既定では `0.0.0.0:3000` にバインドし、信頼できる LAN 内の別端末から `http://<ホスト端末のLAN IP>:3000/login` でログイン画面を開けます。
++
++ホスト OS のファイアウォールで `3000/tcp` の受信許可が必要な場合があります。ポートや bind address を変える場合は、`.env` の `NEXTPATCH_BIND_HOST` と `NEXTPATCH_HOST_PORT` を変更してください。
++
++HTTPS が必要な場合は、別途リバースプロキシで HTTPS を終端し、`NEXTPATCH_COOKIE_SECURE=true` を設定してください。
+ 
+ ## Stop
+ 
+@@ -40,48 +52,49 @@ Use this path when you want the app running as a persistent local server.
+ docker compose down
+ ```
+ 
+-Use `docker compose down` to stop the daily local server stack.
++日常利用のローカルサーバースタックを停止するには `docker compose down` を使います。
+ 
+ ## Schema and Migrations
+ 
+-The SQLite migration source of truth is the hand-written SQL under `drizzle/*.sql`.
+-Those files define the authoritative tables, constraints, and indexes, and the migration runner is responsible for recording applied steps in `nextpatch_migrations` history.
++SQLite 移行の正本は `drizzle/*.sql` 以下の手書き SQL です。
++それらのファイルがテーブル、制約、インデックスの正しい定義を持ち、migration runner は適用済みステップを `nextpatch_migrations` 履歴に記録する役割を持ちます。
+ 
+-`src/server/db/schema.ts` is used for Drizzle query typing and should stay aligned with the SQL, but it is not the canonical source for FK or CHECK constraints.
++`src/server/db/schema.ts` は Drizzle のクエリ型付けに使われ、SQL と整合している必要がありますが、FK や CHECK 制約の正本ではありません。
+ 
+-Do not use `db:generate` for SQLite migrations; the project does not keep `drizzle-kit` as a dev dependency. New schema changes should be written directly as SQL migrations and added to the migration history through the runner.
++SQLite の migration では `db:generate` を使わないでください。このプロジェクトは `drizzle-kit` を dev dependency として保持していません。新しいスキーマ変更は SQL migration を直接書き、runner 経由で migration history に追加してください。
+ 
+ ## Backup
+ 
+-Use Settings > Data to create a JSON export. Keep that JSON export as the canonical backup artifact.
+-Markdown and CSV exports are for reading and audit only.
++Settings > Data から JSON エクスポートを作成してください。その JSON エクスポートを正規のバックアップ成果物として保持します。
++Markdown と CSV のエクスポートは閲覧と監査用途に限ります。
+ 
+-For the database volume, keep `data/`, `exports/`, and `backups/` out of Git. SQLite WAL and SHM sidecar files must stay with the database file while the app is running.
++DB ボリュームについては、`data/`、`exports/`、`backups/` を Git 管理から外してください。SQLite の WAL / SHM 付随ファイルは、アプリ実行中は DB ファイルと一緒に置いておく必要があります。
+ 
+-When DB file backup is implemented, prefer SQLite-safe backup approaches such as JSON export or a controlled SQLite backup operation rather than copying a live database file.
++DB ファイルのバックアップが実装されたら、稼働中の DB ファイルを単純コピーするのではなく、JSON エクスポートや制御された SQLite backup 操作のような SQLite 安全な方法を優先してください。
+ 
+-Do not commit backups to GitHub automatically. They may contain confidential repository notes.
++バックアップを GitHub に自動コミットしないでください。機密性のあるリポジトリメモを含む可能性があります。
+ 
+ ## Restore
+ 
+-Restore is not implemented in the MVP. Treat JSON backup as the preserved backup source for future manual migration or later restore work.
+-The MVP does not merge into an existing workspace and does not restore from Markdown or CSV.
++Restore は MVP では未実装です。JSON バックアップを、将来の手動移行や後続の restore 作業に使う保存済みバックアップソースとして扱ってください。
++MVP は既存ワークスペースへのマージも、Markdown や CSV からの restore も行いません。
+ 
+ ## Docker Build Note
+ 
+-The SQLite implementation is expected to use `better-sqlite3`, which has a native addon.
+-If the dependency is added while using the Alpine Docker image, the deps stage must include the native build toolchain needed by `node-gyp` such as Python, make, and a C++ compiler, or the image should move to a Debian-based Node image.
++SQLite 実装では native addon を持つ `better-sqlite3` を使う想定です。
++Alpine ベースの Docker イメージでこの依存関係を追加する場合、deps ステージに Python、make、C++ コンパイラなど `node-gyp` に必要な native build toolchain を含めるか、Debian ベースの Node イメージへ切り替えてください。
+ 
+ ## Fresh Start
+ 
+-For a clean local restart, stop the app, remove the SQLite database with `pnpm db:reset:dev`, then rerun migrations and seed. In Docker, `docker compose down -v` also removes the data volume if you want to discard persistent state completely.
++きれいにローカルを再起動するには、アプリを停止し、`pnpm db:reset:dev` で SQLite DB を削除してから、migration と seed を再実行してください。Docker では、永続状態を完全に破棄したい場合に `docker compose down -v` でデータボリュームも削除できます。
++
++## Login
+ 
+-## Login Route
++`/login` は LAN 内利用向けの共通パスワードログイン画面です。ログインに成功すると署名付き HttpOnly Cookie セッションを発行し、指定された安全な内部パス、または `/dashboard` に遷移します。ログアウトはアプリヘッダーの「ログアウト」ボタンから行います。
+ 
+-`/login` is kept only as a bookmark-safe redirect to `/dashboard`. It is not a login feature, and the SQLite local MVP does not include email sign-in or an auth callback.
++`NEXTPATCH_LOGIN_PASSWORD` または `NEXTPATCH_SESSION_SECRET` が未設定の場合、保護対象画面は利用できません。`/login` に設定不足の通知が表示されます。
+ 
+ ## External Exposure
+ 
+-External publication is not recommended for the MVP.
+-The app is a local single-user build with access control not implemented, so exposing it on a LAN is unsafe unless you add your own protection layer.
+-The default compose port binding is local-only; if you change it for LAN exposure, add HTTPS, an explicit access-control layer, regular JSON exports, DB volume backups, and firewall rules first.
++この実装は、信頼できる LAN 内での簡易保護を目的としています。NextPatch を直接インターネットに公開しないでください。
++インターネット公開やリモートアクセスが必要な場合は、この実装だけでは不十分です。別途 HTTPS、リバースプロキシ、ファイアウォール、アクセス制御、バックアップ運用などを設計し、HTTPS 終端時は `NEXTPATCH_COOKIE_SECURE=true` を設定してください。
+diff --git a/docker-compose.yml b/docker-compose.yml
+index 092afbc..7ffe975 100644
+--- a/docker-compose.yml
++++ b/docker-compose.yml
+@@ -8,12 +8,13 @@ services:
+     environment:
+       NODE_ENV: production
+       PORT: 3000
++      HOSTNAME: 0.0.0.0
+       NEXTPATCH_RUNTIME_MODE: local-server
+       NEXTPATCH_DATA_DIR: /app/data
+       NEXTPATCH_DB_PATH: /app/data/nextpatch.sqlite
+       NEXTPATCH_EXPORT_DIR: /app/data/exports
+     ports:
+-      - "127.0.0.1:3000:3000"
++      - "${NEXTPATCH_BIND_HOST:-0.0.0.0}:${NEXTPATCH_HOST_PORT:-3000}:3000"
+     volumes:
+       - nextpatch_data:/app/data
+     restart: unless-stopped
+diff --git a/docs/auth-lan-access/agent-prompts.md b/docs/auth-lan-access/agent-prompts.md
+new file mode 100644
+index 0000000..b3ec636
+--- /dev/null
++++ b/docs/auth-lan-access/agent-prompts.md
+@@ -0,0 +1,171 @@
++# Sub-Agent Prompts
++
++## Auth Core
++
++あなたは NextPatch の Auth Core サブエージェントです。必ず `../nextpatch-auth-core` の個別 git worktree で作業してください。他の worktree は編集しないでください。
++
++目的: NextPatch に単一ユーザー向けの簡易ログイン基盤を追加する。
++
++担当範囲:
++
++- `src/server/auth/session.ts`
++- `src/server/auth/config.ts` 新規作成可
++- `src/server/auth/session-token.ts` 新規作成可
++- `src/server/auth/redirects.ts` 新規作成可
++- `src/server/auth/actions.ts` 新規作成可
++- `src/proxy.ts` 新規作成
++- 必要最小限の関連ファイル
++
++要件:
++
++- `NEXTPATCH_LOGIN_PASSWORD` と `NEXTPATCH_SESSION_SECRET` を使う。
++- 署名付き HttpOnly Cookie セッションを実装する。
++- Cookie 名は `nextpatch_session` を基本にする。
++- `maxAge` は `NEXTPATCH_SESSION_MAX_AGE_SECONDS`、未指定なら `604800` 秒。
++- `secure` は `NEXTPATCH_COOKIE_SECURE=true` のときのみ true。
++- `sameSite` は `lax`、`path` は `/`。
++- セッション検証は Proxy と Server Action / Server Component の両方で使えるようにする。
++- Proxy では DB にアクセスしない。
++- Next.js 16 のため `src/proxy.ts` を使い、`middleware.ts` は作らない。
++- Protected paths: `/`, `/dashboard`, `/repositories`, `/work-items`, `/inbox`, `/capture`, `/ideas`, `/tech-notes`, `/references`, `/settings`, `/api/export/*`
++- Public paths: `/login`, `/_next/*`, favicon, robots, public static assets
++- 未認証ページアクセスは `/login?next=<safe path>` へ。
++- 未認証 API アクセスは 401 か login redirect のどちらかを、実装全体の整合性を見て採用する。
++- 認証済みで `/login` に来たら `/dashboard` へ。
++- `next` パラメータは内部パスのみ許可。
++- `requireLocalContext()` はセッション検証後に既存の local user/workspace を返す。
++- 未認証で Server Action によるデータ変更ができないようにする。
++- 認証未設定時は認証を通さない。
++
++検証:
++
++- `pnpm typecheck`
++- 可能なら対象 unit test を追加して `pnpm test` の該当範囲
++
++報告:
++
++- 変更ファイル一覧
++- 実装内容
++- 実行した検証
++- 未実行検証と理由
++- メイン側マージ時の注意点
++
++## Auth UI
++
++あなたは NextPatch の Auth UI サブエージェントです。必ず `../nextpatch-auth-ui` の個別 git worktree で作業してください。他の worktree は編集しないでください。
++
++目的: DADS 参照ルールに沿った簡易ログイン画面とログアウト導線を実装する。
++
++担当範囲:
++
++- `src/app/(auth)/login/page.tsx`
++- `src/app/(app)/layout.tsx`
++- `src/app/globals.css`
++- `src/styles/tokens.css` は必要な場合のみ
++
++要件:
++
++- `/login` は実ログインフォームにする。
++- ラベル必須、サポートテキストあり、プレースホルダーに依存しない。
++- エラーは静的に具体的に表示し、disabled を安易に使わない。
++- ボタン押下領域は 44px 以上、プライマリー CTA は「ログイン」1つ。
++- 入力は `type=password`, `name=password`, `autocomplete=current-password`。
++- label: `ログインパスワード ※必須`
++- support text: `LAN内のNextPatchにアクセスするための共通パスワードを入力します。`
++- invalid error: `＊パスワードが一致しません。管理者が設定したログインパスワードを入力してください。`
++- missing-config error: `＊ログイン設定が不足しています。.env の NEXTPATCH_LOGIN_PASSWORD と NEXTPATCH_SESSION_SECRET を設定してから再起動してください。`
++- ログイン画面に `NextPatch` と `LAN内利用向けの簡易ログイン` を表示する。
++- パスワードやシークレットの値は表示しない。
++- ヘッダーにログアウトボタンを追加する。
++- 既存の Quick Capture 導線も維持する。
++- 「ローカル運用」は LAN ログイン導入後に合う表現へ更新する。
++- モバイル幅でも破綻しない。
++
++検証:
++
++- `pnpm typecheck`
++- `pnpm lint`
++- 可能ならスクリーンリーダー/キーボード操作観点の確認項目を報告
++
++報告:
++
++- 変更ファイル一覧
++- 実装内容
++- 実行した検証
++- 未実行検証と理由
++- メイン側マージ時の注意点
++
++## LAN Runtime & Docs
++
++あなたは NextPatch の LAN Runtime & Docs サブエージェントです。必ず `../nextpatch-lan-runtime-docs` の個別 git worktree で作業してください。他の worktree は編集しないでください。
++
++目的: localhost 固定の公開仕様を修正し、ログイン保護付きで LAN 内の他端末からアクセスできる起動設定とドキュメントを整える。
++
++担当範囲:
++
++- `docker-compose.yml`
++- `Dockerfile`
++- `.env.example`
++- `package.json`
++- `README.md`
++- `docs/auth-lan-access/*` のうちランタイム・運用説明に関する部分
++
++要件:
++
++- `docker-compose.yml` の ports を `${NEXTPATCH_BIND_HOST:-0.0.0.0}:${NEXTPATCH_HOST_PORT:-3000}:3000` に変更する。
++- `PORT` はコンテナ内 3000 を維持する。
++- 必要なら `HOSTNAME=0.0.0.0` を設定する。
++- `.env.example` に `NEXTPATCH_BIND_HOST`, `NEXTPATCH_HOST_PORT`, `NEXTPATCH_LOGIN_PASSWORD`, `NEXTPATCH_SESSION_SECRET`, `NEXTPATCH_SESSION_MAX_AGE_SECONDS`, `NEXTPATCH_COOKIE_SECURE` を追加する。
++- `.env.example` に実秘密値を入れない。
++- README の古い「ログイン機能なし」「LAN 公開非推奨」「127.0.0.1 固定」などの説明を新仕様に合わせて修正する。
++- 信頼できる LAN 内利用であること、インターネット公開は対象外であること、HTTPS が必要ならリバースプロキシ終端と `NEXTPATCH_COOKIE_SECURE=true` が必要であることを書く。
++- 必要なら `dev:lan` を追加する。
++
++検証:
++
++- `docker compose config`
++- 影響があれば `pnpm lint` / `pnpm typecheck`
++- Docker 実起動ができるなら `docker compose up -d --build`
++
++報告:
++
++- 変更ファイル一覧
++- 実装内容
++- 実行した検証
++- 未実行検証と理由
++- メイン側マージ時の注意点
++
++## Tests
++
++あなたは NextPatch の Tests サブエージェントです。必ず `../nextpatch-auth-tests` の個別 git worktree で作業してください。他の worktree は編集しないでください。
++
++目的: 簡易ログインと LAN 対応に合わせて unit/e2e テストを更新する。
++
++担当範囲:
++
++- `src/server/auth/*.test.ts` 新規作成可
++- `tests/e2e/sqlite-smoke.spec.ts`
++- `scripts/e2e/web-server.ts`
++- `playwright.config.ts`
++- 必要最小限のテスト補助ファイル
++
++要件:
++
++- Unit test: セッショントークン生成・検証、期限切れ拒否、署名改ざん拒否、`next` 安全化、認証設定不足検出。
++- e2e: 未認証 `/dashboard` の `/login` 誘導、誤パスワードの具体的エラー、正しいパスワードでログイン、既存 smoke flow 継続、認証後 API export 200。
++- `scripts/e2e/web-server.ts` でテスト用の `NEXTPATCH_LOGIN_PASSWORD` と `NEXTPATCH_SESSION_SECRET` を設定する。
++- 既存 `assertNoAuthPrompts` は外部認証プロンプト確認に限定する。
++
++検証:
++
++- `pnpm test`
++- `pnpm test:e2e`
++- 必要なら `pnpm typecheck`
++
++報告:
++
++- 変更ファイル一覧
++- 実装内容
++- 実行した検証
++- 未実行検証と理由
++- メイン側マージ時の注意点
+diff --git a/docs/auth-lan-access/checklist.md b/docs/auth-lan-access/checklist.md
+new file mode 100644
+index 0000000..862ac6a
+--- /dev/null
++++ b/docs/auth-lan-access/checklist.md
+@@ -0,0 +1,46 @@
++# Auth LAN Access Checklist
++
++## Auth Core
++
++- [x] `NEXTPATCH_LOGIN_PASSWORD` and `NEXTPATCH_SESSION_SECRET` are required for protected access.
++- [x] Session cookie is HttpOnly, sameSite lax, path `/`, max age configurable, and optionally secure.
++- [x] Session token includes issued-at, expiry, and HMAC-SHA256 signature.
++- [x] Password comparison uses timing-safe comparison where practical.
++- [x] `src/proxy.ts` protects the required page and export API paths.
++- [x] `/login` remains public and authenticated users are sent to `/dashboard`.
++- [x] Unsafe `next` values fall back to `/dashboard`.
++- [x] `requireLocalContext()` blocks unauthenticated access before returning the local context.
++
++## UI
++
++- [x] Login page has a visible label, support text, and one primary `ログイン` CTA.
++- [x] Password input uses `type=password`, `name=password`, and `autocomplete=current-password`.
++- [x] Invalid password and missing config errors are explicit and static.
++- [x] Password and secret values are never rendered.
++- [x] Header includes logout and preserves Quick Capture.
++- [x] Header copy reflects LAN authenticated operation.
++- [x] Mobile layout remains usable.
++
++## LAN Runtime & Docs
++
++- [x] Compose port binding supports LAN access with configurable host and port.
++- [x] Container still uses port 3000 internally.
++- [x] Runtime binds to `0.0.0.0` when required by standalone Next server.
++- [x] `.env.example` contains auth and LAN variables with no real secrets.
++- [x] README explains trusted LAN-only usage, setup, secret generation, firewall note, and HTTPS reverse proxy option.
++- [x] README does not retain obsolete "no login" or localhost-only operation claims.
++
++## Tests
++
++- [x] Unit tests cover token success, expiry, tampering, next sanitization, and missing config.
++- [x] e2e sets test auth environment variables.
++- [x] e2e covers unauthenticated redirect, invalid password error, successful login, existing smoke flow, export API 200.
++- [x] External auth prompt check no longer rejects the legitimate login UI.
++
++## Final Artifacts
++
++- [x] `docs/auth-lan-access/auth-lan-access.patch` created with `git diff --binary`.
++- [x] `nextpatch-auth-lan-access-implementation.zip` created at repo root.
++- [x] Zip excludes generated, database, and bulky runtime artifacts.
++- [x] `unzip -l` output inspected.
++- [x] Final verification results recorded.
+diff --git a/docs/auth-lan-access/implementation-plan.md b/docs/auth-lan-access/implementation-plan.md
+new file mode 100644
+index 0000000..7335e2a
+--- /dev/null
++++ b/docs/auth-lan-access/implementation-plan.md
+@@ -0,0 +1,60 @@
++# NextPatch LAN Auth Implementation Plan
++
++## Goal
++
++NextPatch のローカル単一ユーザー構造を維持したまま、信頼できる LAN 内で使うための簡易パスワードログインと署名付き HttpOnly Cookie セッションを追加する。Docker Compose は LAN 内の別端末から `http://<host-lan-ip>:3000` で到達できるポート公開設定へ変更する。
++
++## Constraints
++
++- `LOCAL_USER_ID = "local-user"` と `PERSONAL_WORKSPACE_ID = "personal-workspace"` を維持する。
++- DB にユーザー管理テーブルを追加しない。
++- 認証情報は `NEXTPATCH_LOGIN_PASSWORD` と `NEXTPATCH_SESSION_SECRET` で設定する。
++- 未設定時は保護対象を利用可能にしない。
++- セッションは `nextpatch_session` Cookie に HMAC-SHA256 署名付きトークンとして保存する。
++- Proxy では DB にアクセスしない。
++- Next.js 16 のため `src/proxy.ts` を使い、`middleware.ts` は作成しない。
++- インターネット公開、SSO、多人数管理、パスワードリセット、HTTPS 終端は今回の対象外。
++
++## Protected Surface
++
++- Pages: `/`, `/dashboard`, `/repositories`, `/work-items`, `/inbox`, `/capture`, `/ideas`, `/tech-notes`, `/references`, `/settings`
++- API: `/api/export/*`
++- Public: `/login`, `/_next/*`, static assets, favicon, robots
++
++## Phases
++
++1. Phase 0: main agent preparation
++   - Inspect required files and dirty worktree state.
++   - Create `docs/auth-lan-access/` artifacts.
++   - Create individual git worktrees for sub-agents.
++2. Phase 1: Auth Core sub-agent
++   - Implement config, token signing, proxy protection, login/logout actions, and `requireLocalContext()` checks.
++3. Phase 2: Auth UI sub-agent
++   - Implement DADS-aligned login form and header logout affordance.
++4. Phase 3: LAN Runtime & Docs sub-agent
++   - Update Docker Compose, environment examples, package scripts, Docker runtime settings, and README.
++5. Phase 4: Tests sub-agent
++   - Add unit tests and update Playwright smoke flow for login.
++6. Phase 5: main agent integration
++   - Merge Phase 1 through Phase 4 in order.
++   - Resolve conflicts and align action/helper names.
++   - Run verification commands.
++   - Generate `docs/auth-lan-access/auth-lan-access.patch`.
++   - Create and inspect `nextpatch-auth-lan-access-implementation.zip`.
++
++## Merge Order
++
++1. `feature/auth-core`
++2. `feature/auth-ui`
++3. `feature/lan-runtime-docs`
++4. `feature/auth-tests`
++
++## Verification Target
++
++- `pnpm lint`
++- `pnpm typecheck`
++- `pnpm test`
++- `pnpm test:e2e`
++- `docker compose config`
++- If possible: `docker compose up -d --build`
++- If possible: `http://127.0.0.1:3000/login` and LAN IP `/login` reachability checks
+diff --git a/docs/auth-lan-access/manifest.md b/docs/auth-lan-access/manifest.md
+new file mode 100644
+index 0000000..6663a8c
+--- /dev/null
++++ b/docs/auth-lan-access/manifest.md
+@@ -0,0 +1,43 @@
++# Auth LAN Access Manifest
++
++## Required Deliverables
++
++- Source changes for auth core, login/logout UI, LAN runtime configuration, docs, and tests.
++- `docs/auth-lan-access/implementation-plan.md`
++- `docs/auth-lan-access/agent-prompts.md`
++- `docs/auth-lan-access/checklist.md`
++- `docs/auth-lan-access/manifest.md`
++- `docs/auth-lan-access/auth-lan-access.patch`
++- `nextpatch-auth-lan-access-implementation.zip`
++
++## Expected Changed Areas
++
++- `src/server/auth/*`
++- `src/proxy.ts`
++- `src/app/(auth)/login/page.tsx`
++- `src/app/(app)/layout.tsx`
++- `src/app/globals.css`
++- `tests/e2e/sqlite-smoke.spec.ts`
++- `scripts/e2e/web-server.ts`
++- `playwright.config.ts` if required
++- `README.md`
++- `.env.example`
++- `docker-compose.yml`
++- `Dockerfile`
++- `package.json`
++
++## Zip Exclusions
++
++- `node_modules/`
++- `.next/`
++- `data/`
++- `exports/`
++- `backups/`
++- SQLite database files, WAL, and SHM files
++- `playwright-report/`
++- `test-results/`
++
++## Notes
++
++- The final README must describe LAN usage as trusted LAN-only operation.
++- Public internet exposure is outside this implementation and requires separate HTTPS, reverse proxy, and firewall controls.
+diff --git a/package.json b/package.json
+index 4f62c03..ed6d57a 100644
+--- a/package.json
++++ b/package.json
+@@ -7,6 +7,7 @@
+     "dev": "next dev",
+     "build": "next build",
+     "start": "next start",
++    "dev:lan": "next dev --hostname 0.0.0.0",
+     "lint": "eslint .",
+     "typecheck": "tsc --noEmit",
+     "db:migrate": "tsx src/server/db/migrate.ts",
+diff --git a/playwright.config.ts b/playwright.config.ts
+index 7e39349..1579c1c 100644
+--- a/playwright.config.ts
++++ b/playwright.config.ts
+@@ -15,7 +15,7 @@ export default defineConfig({
+   ],
+   webServer: {
+     command: "pnpm test:e2e:server",
+-    url: "http://127.0.0.1:3000/dashboard",
++    url: "http://127.0.0.1:3000/login",
+     reuseExistingServer: false,
+     timeout: 120_000
+   }
+diff --git a/scripts/e2e/web-server.ts b/scripts/e2e/web-server.ts
+index 9c12076..e2509bf 100644
+--- a/scripts/e2e/web-server.ts
++++ b/scripts/e2e/web-server.ts
+@@ -15,6 +15,8 @@ process.env.NEXTPATCH_DATA_DIR = tempDir;
+ process.env.NEXTPATCH_DB_PATH = dbPath;
+ process.env.NEXTPATCH_EXPORT_DIR = exportDir;
+ process.env.NEXTPATCH_RUNTIME_MODE = "e2e";
++process.env.NEXTPATCH_LOGIN_PASSWORD = process.env.NEXTPATCH_LOGIN_PASSWORD ?? "e2e-password";
++process.env.NEXTPATCH_SESSION_SECRET = process.env.NEXTPATCH_SESSION_SECRET ?? "e2e-session-secret";
+ 
+ try {
+   migrateDatabase(dbPath);
+@@ -24,7 +26,7 @@ try {
+   throw error;
+ }
+ 
+-const child = spawn("pnpm", ["dev"], {
++const child = spawn("pnpm", ["exec", "next", "dev", "--hostname", "0.0.0.0"], {
+   env: process.env,
+   stdio: "inherit"
+ });
+diff --git a/src/app/(app)/layout.tsx b/src/app/(app)/layout.tsx
+index b8906a0..9370077 100644
+--- a/src/app/(app)/layout.tsx
++++ b/src/app/(app)/layout.tsx
+@@ -1,3 +1,4 @@
++import { logoutAction } from "@/server/auth/actions";
+ import { requireLocalContext } from "@/server/auth/session";
+ import Link from "next/link";
+ 
+@@ -38,13 +39,18 @@ export default async function AppLayout({
+         <div className="main-area">
+           <header className="topbar">
+             <div>
+-              <strong>ローカル運用</strong>
+-              <p className="support">Workspace: {workspace.name}</p>
++              <strong>LAN内運用</strong>
++              <p className="support">ログイン中: {workspace.name}</p>
+             </div>
+             <div className="button-row">
+               <Link className="button" href="/capture/new">
+                 Quick Capture
+               </Link>
++              <form action={logoutAction}>
++                <button className="button button--secondary" type="submit">
++                  ログアウト
++                </button>
++              </form>
+             </div>
+           </header>
+           {children}
+diff --git a/src/app/(app)/settings/system/page.tsx b/src/app/(app)/settings/system/page.tsx
+index 14d35a9..7e86d53 100644
+--- a/src/app/(app)/settings/system/page.tsx
++++ b/src/app/(app)/settings/system/page.tsx
+@@ -36,7 +36,7 @@ export default function SystemSettingsPage() {
+         <section className="banner banner--warning" aria-labelledby="lan-heading">
+           <h2 id="lan-heading">LAN 公開時の注意</h2>
+           <p>
+-            初期実装は無認証の local single-user 前提で、access control は未実装です。
++            パスワード認証は追加されていますが、単一ユーザー向けの簡易実装です。
+             信頼できる端末だけが届く localhost または信頼済み LAN で使い、公開ネットワークへ直接出さないでください。
+           </p>
+         </section>
+diff --git a/src/app/(auth)/login/page.tsx b/src/app/(auth)/login/page.tsx
+index 7b0d616..bfb67e1 100644
+--- a/src/app/(auth)/login/page.tsx
++++ b/src/app/(auth)/login/page.tsx
+@@ -1,6 +1,84 @@
++import type { Metadata } from "next";
+ import { redirect } from "next/navigation";
++import { loginAction } from "@/server/auth/actions";
++import { getAuthConfig } from "@/server/auth/config";
++import { sanitizeNextPath } from "@/server/auth/redirects";
++import { getAuthenticatedLocalContext } from "@/server/auth/session";
+ 
+-export default function LoginPage() {
+-  // This route remains only as a bookmark-safe dashboard redirect, not a login surface.
+-  redirect("/dashboard");
++export const dynamic = "force-dynamic";
++
++export const metadata: Metadata = {
++  title: "ログイン | NextPatch"
++};
++
++const errorMessages = {
++  invalid: "＊パスワードが一致しません。管理者が設定したログインパスワードを入力してください。",
++  "missing-config":
++    "＊ログイン設定が不足しています。.env の NEXTPATCH_LOGIN_PASSWORD と NEXTPATCH_SESSION_SECRET を設定してから再起動してください。"
++} as const;
++
++type LoginPageProps = {
++  searchParams?: Promise<{
++    next?: string | string[];
++    error?: string | string[];
++  }>;
++};
++
++export default async function LoginPage({ searchParams }: LoginPageProps) {
++  if (await getAuthenticatedLocalContext()) {
++    redirect("/dashboard");
++  }
++
++  const params = await searchParams;
++  const nextPath = sanitizeNextPath(Array.isArray(params?.next) ? params.next[0] : params?.next);
++  const errorKey = Array.isArray(params?.error) ? params.error[0] : params?.error;
++  const config = getAuthConfig();
++  const configError = config ? null : errorMessages["missing-config"];
++  const actionError = errorKey && errorKey in errorMessages ? errorMessages[errorKey as keyof typeof errorMessages] : null;
++  const errorMessage = configError ?? actionError;
++  const supportId = "login-password-support";
++  const errorId = errorMessage ? "login-password-error" : undefined;
++  const describedBy = [supportId, errorId].filter(Boolean).join(" ");
++
++  return (
++    <main className="auth-page">
++      <section className="auth-box panel auth-card" aria-labelledby="login-title">
++        <div className="auth-hero">
++          <p className="eyebrow">NextPatch</p>
++          <h1 id="login-title">LAN内利用向けの簡易ログイン</h1>
++          <p className="support">信頼できるLAN内のNextPatchにアクセスするための共通パスワードを入力します。</p>
++        </div>
++
++        <form action={loginAction} className="form-stack auth-form">
++          <input name="next" type="hidden" value={nextPath} />
++          <div className="field">
++            <label htmlFor="password">
++              ログインパスワード <span className="required">※必須</span>
++            </label>
++            <p className="support" id={supportId}>
++              LAN内のNextPatchにアクセスするための共通パスワードを入力します。
++            </p>
++            <input
++              aria-describedby={describedBy || undefined}
++              autoComplete="current-password"
++              id="password"
++              name="password"
++              type="password"
++            />
++            {errorMessage ? (
++              <p className="error-text" id={errorId}>
++                {errorMessage}
++              </p>
++            ) : null}
++          </div>
++
++          <div className="auth-actions">
++            <button className="button" type="submit">
++              ログイン
++            </button>
++          </div>
++        </form>
++      </section>
++    </main>
++  );
+ }
+diff --git a/src/app/globals.css b/src/app/globals.css
+index 7da23e6..09f67e4 100644
+--- a/src/app/globals.css
++++ b/src/app/globals.css
+@@ -107,6 +107,7 @@ select {
+ 
+ .topbar {
+   display: flex;
++  flex-wrap: wrap;
+   align-items: center;
+   justify-content: space-between;
+   gap: var(--space-2);
+@@ -388,12 +389,48 @@ th {
+   place-items: center;
+   min-height: 100svh;
+   padding: var(--space-3);
++  background:
++    radial-gradient(circle at top left, rgba(29, 78, 216, 0.08), transparent 42%),
++    radial-gradient(circle at bottom right, rgba(109, 40, 217, 0.08), transparent 38%),
++    var(--color-bg);
+ }
+ 
+ .auth-box {
+   width: min(560px, 100%);
+ }
+ 
++.auth-card {
++  display: grid;
++  gap: var(--space-3);
++  padding: clamp(24px, 4vw, 40px);
++  border: 1px solid var(--color-border-soft);
++  border-radius: var(--radius-lg);
++  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.08);
++}
++
++.auth-hero {
++  display: grid;
++  gap: var(--space-1);
++}
++
++.auth-hero h1 {
++  font-size: clamp(28px, 4vw, 38px);
++  line-height: 1.25;
++}
++
++.auth-form {
++  gap: var(--space-2);
++}
++
++.auth-actions {
++  display: grid;
++  gap: var(--space-1);
++}
++
++.auth-actions .button {
++  width: 100%;
++}
++
+ @media (max-width: 767px) {
+   .app-frame {
+     display: block;
+@@ -460,4 +497,12 @@ th {
+   .button {
+     width: 100%;
+   }
++
++  .auth-page {
++    padding: var(--space-2);
++  }
++
++  .auth-card {
++    padding: var(--space-2);
++  }
+ }
+diff --git a/src/proxy.ts b/src/proxy.ts
+new file mode 100644
+index 0000000..daeaf54
+--- /dev/null
++++ b/src/proxy.ts
+@@ -0,0 +1,39 @@
++import { NextResponse, type NextRequest } from "next/server";
++import { getAuthenticatedLocalContextFromCookieHeader } from "@/server/auth/session";
++import { getLoginPath, isProtectedPath, isPublicPath, sanitizeNextPath } from "@/server/auth/redirects";
++
++export async function proxy(request: NextRequest) {
++  const pathname = request.nextUrl.pathname;
++  const authenticated = await getAuthenticatedLocalContextFromCookieHeader(request.headers.get("cookie"));
++
++  if (pathname === "/login") {
++    if (authenticated) {
++      return NextResponse.redirect(new URL("/dashboard", request.url), 303);
++    }
++
++    return NextResponse.next();
++  }
++
++  if (isPublicPath(pathname)) {
++    return NextResponse.next();
++  }
++
++  if (authenticated) {
++    return NextResponse.next();
++  }
++
++  if (pathname.startsWith("/api/")) {
++    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
++  }
++
++  if (isProtectedPath(pathname)) {
++    const loginUrl = new URL(getLoginPath(sanitizeNextPath(`${pathname}${request.nextUrl.search}`)), request.url);
++    return NextResponse.redirect(loginUrl, 303);
++  }
++
++  return NextResponse.next();
++}
++
++export const config = {
++  matcher: ["/((?!_next/static|_next/image|favicon.ico|robots.txt|.*\\..*).*)", "/api/:path*"]
++};
+diff --git a/src/server/auth/actions.ts b/src/server/auth/actions.ts
+new file mode 100644
+index 0000000..2da5567
+--- /dev/null
++++ b/src/server/auth/actions.ts
+@@ -0,0 +1,62 @@
++"use server";
++
++import crypto from "node:crypto";
++import { cookies } from "next/headers";
++import { redirect } from "next/navigation";
++import { getAuthConfig, SESSION_COOKIE_NAME } from "@/server/auth/config";
++import { getLoginPath, sanitizeNextPath } from "@/server/auth/redirects";
++import { createSessionToken } from "@/server/auth/session-token";
++
++export async function loginAction(formData: FormData) {
++  const config = getAuthConfig();
++  const nextPath = sanitizeNextPath(formData.get("next")?.toString());
++
++  if (!config) {
++    redirect(getLoginPath(nextPath, "missing-config"));
++  }
++
++  const password = formData.get("password")?.toString() ?? "";
++  if (!isPasswordMatch(password, config.loginPassword)) {
++    redirect(getLoginPath(nextPath, "invalid"));
++  }
++
++  const now = Math.floor(Date.now() / 1000);
++  const token = await createSessionToken(
++    {
++      issuedAt: now,
++      expiresAt: now + config.sessionMaxAgeSeconds
++    },
++    config.sessionSecret
++  );
++
++  const cookieStore = await cookies();
++  cookieStore.set(SESSION_COOKIE_NAME, token, {
++    httpOnly: true,
++    sameSite: "lax",
++    secure: config.cookieSecure,
++    path: "/",
++    maxAge: config.sessionMaxAgeSeconds
++  });
++
++  redirect(nextPath || "/dashboard");
++}
++
++export async function logoutAction() {
++  const config = getAuthConfig();
++  const cookieStore = await cookies();
++  cookieStore.set(SESSION_COOKIE_NAME, "", {
++    httpOnly: true,
++    sameSite: "lax",
++    secure: config?.cookieSecure ?? false,
++    path: "/",
++    maxAge: 0
++  });
++
++  redirect("/login");
++}
++
++function isPasswordMatch(actual: string, expected: string) {
++  const actualHash = crypto.createHash("sha256").update(actual, "utf8").digest();
++  const expectedHash = crypto.createHash("sha256").update(expected, "utf8").digest();
++  return actualHash.length === expectedHash.length && crypto.timingSafeEqual(actualHash, expectedHash);
++}
+diff --git a/src/server/auth/config.test.ts b/src/server/auth/config.test.ts
+new file mode 100644
+index 0000000..23a6117
+--- /dev/null
++++ b/src/server/auth/config.test.ts
+@@ -0,0 +1,39 @@
++import { afterEach, describe, expect, it } from "vitest";
++import { DEFAULT_SESSION_MAX_AGE_SECONDS, getAuthConfig } from "./config";
++
++const originalLoginPassword = process.env.NEXTPATCH_LOGIN_PASSWORD;
++const originalSessionSecret = process.env.NEXTPATCH_SESSION_SECRET;
++const originalSessionMaxAgeSeconds = process.env.NEXTPATCH_SESSION_MAX_AGE_SECONDS;
++const originalCookieSecure = process.env.NEXTPATCH_COOKIE_SECURE;
++
++afterEach(() => {
++  process.env.NEXTPATCH_LOGIN_PASSWORD = originalLoginPassword;
++  process.env.NEXTPATCH_SESSION_SECRET = originalSessionSecret;
++  process.env.NEXTPATCH_SESSION_MAX_AGE_SECONDS = originalSessionMaxAgeSeconds;
++  process.env.NEXTPATCH_COOKIE_SECURE = originalCookieSecure;
++});
++
++describe("getAuthConfig", () => {
++  it("detects missing auth configuration", () => {
++    delete process.env.NEXTPATCH_LOGIN_PASSWORD;
++    delete process.env.NEXTPATCH_SESSION_SECRET;
++    expect(getAuthConfig()).toBeNull();
++
++    process.env.NEXTPATCH_LOGIN_PASSWORD = "password";
++    expect(getAuthConfig()).toBeNull();
++  });
++
++  it("uses defaults for optional settings", () => {
++    process.env.NEXTPATCH_LOGIN_PASSWORD = "password";
++    process.env.NEXTPATCH_SESSION_SECRET = "secret";
++    delete process.env.NEXTPATCH_SESSION_MAX_AGE_SECONDS;
++    delete process.env.NEXTPATCH_COOKIE_SECURE;
++
++    expect(getAuthConfig()).toEqual({
++      loginPassword: "password",
++      sessionSecret: "secret",
++      sessionMaxAgeSeconds: DEFAULT_SESSION_MAX_AGE_SECONDS,
++      cookieSecure: false
++    });
++  });
++});
+diff --git a/src/server/auth/config.ts b/src/server/auth/config.ts
+new file mode 100644
+index 0000000..baf3a48
+--- /dev/null
++++ b/src/server/auth/config.ts
+@@ -0,0 +1,43 @@
++export const SESSION_COOKIE_NAME = "nextpatch_session";
++export const DEFAULT_SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 7;
++
++export type AuthConfig = {
++  loginPassword: string;
++  sessionSecret: string;
++  sessionMaxAgeSeconds: number;
++  cookieSecure: boolean;
++};
++
++export function getAuthConfig(): AuthConfig | null {
++  const loginPassword = process.env.NEXTPATCH_LOGIN_PASSWORD;
++  const sessionSecret = process.env.NEXTPATCH_SESSION_SECRET;
++
++  if (!loginPassword || !sessionSecret) {
++    return null;
++  }
++
++  const sessionMaxAgeSeconds = parsePositiveInteger(
++    process.env.NEXTPATCH_SESSION_MAX_AGE_SECONDS,
++    DEFAULT_SESSION_MAX_AGE_SECONDS
++  );
++
++  return {
++    loginPassword,
++    sessionSecret,
++    sessionMaxAgeSeconds,
++    cookieSecure: process.env.NEXTPATCH_COOKIE_SECURE === "true"
++  };
++}
++
++function parsePositiveInteger(value: string | undefined, fallback: number): number {
++  if (!value) {
++    return fallback;
++  }
++
++  const parsed = Number(value);
++  if (!Number.isInteger(parsed) || parsed <= 0) {
++    return fallback;
++  }
++
++  return parsed;
++}
+diff --git a/src/server/auth/redirects.test.ts b/src/server/auth/redirects.test.ts
+new file mode 100644
+index 0000000..f3d6e1b
+--- /dev/null
++++ b/src/server/auth/redirects.test.ts
+@@ -0,0 +1,36 @@
++import { describe, expect, it } from "vitest";
++import { getLoginPath, isProtectedPath, isPublicPath, sanitizeNextPath } from "./redirects";
++
++describe("sanitizeNextPath", () => {
++  it("keeps internal paths", () => {
++    expect(sanitizeNextPath("/dashboard?tab=summary")).toBe("/dashboard?tab=summary");
++  });
++
++  it("rejects external URLs", () => {
++    expect(sanitizeNextPath("https://evil.example")).toBe("/dashboard");
++  });
++
++  it("rejects protocol-relative URLs", () => {
++    expect(sanitizeNextPath("//evil.example")).toBe("/dashboard");
++  });
++});
++
++describe("path guards", () => {
++  it("treats app routes as protected", () => {
++    expect(isProtectedPath("/dashboard")).toBe(true);
++    expect(isProtectedPath("/api/export/json")).toBe(true);
++    expect(isProtectedPath("/login")).toBe(false);
++  });
++
++  it("treats static assets as public", () => {
++    expect(isPublicPath("/_next/static/chunk.js")).toBe(true);
++    expect(isPublicPath("/favicon.ico")).toBe(true);
++    expect(isPublicPath("/robots.txt")).toBe(true);
++  });
++});
++
++describe("getLoginPath", () => {
++  it("builds a safe login redirect path", () => {
++    expect(getLoginPath("/settings?tab=data", "invalid")).toBe("/login?next=%2Fsettings%3Ftab%3Ddata&error=invalid");
++  });
++});
+diff --git a/src/server/auth/redirects.ts b/src/server/auth/redirects.ts
+new file mode 100644
+index 0000000..83ebcd3
+--- /dev/null
++++ b/src/server/auth/redirects.ts
+@@ -0,0 +1,66 @@
++export function sanitizeNextPath(input: string | null | undefined): string {
++  if (!input) {
++    return "/dashboard";
++  }
++
++  const trimmed = input.trim();
++  if (!trimmed || trimmed.startsWith("//") || /^[a-zA-Z][a-zA-Z\d+\-.]*:/.test(trimmed)) {
++    return "/dashboard";
++  }
++
++  if (!trimmed.startsWith("/")) {
++    return "/dashboard";
++  }
++
++  try {
++    const parsed = new URL(trimmed, "http://nextpatch.local");
++    if (parsed.origin !== "http://nextpatch.local" || !parsed.pathname.startsWith("/")) {
++      return "/dashboard";
++    }
++    return `${parsed.pathname}${parsed.search}${parsed.hash}`;
++  } catch {
++    return "/dashboard";
++  }
++}
++
++export function isPublicPath(pathname: string): boolean {
++  if (
++    pathname === "/login" ||
++    pathname === "/favicon.ico" ||
++    pathname === "/robots.txt" ||
++    pathname.startsWith("/_next/")
++  ) {
++    return true;
++  }
++
++  return pathname.includes(".") && !pathname.startsWith("/api/");
++}
++
++export function isProtectedPath(pathname: string): boolean {
++  if (pathname === "/") return true;
++  if (pathname.startsWith("/api/export/")) return true;
++
++  return [
++    "/dashboard",
++    "/repositories",
++    "/work-items",
++    "/inbox",
++    "/capture",
++    "/ideas",
++    "/tech-notes",
++    "/references",
++    "/settings"
++  ].some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
++}
++
++export function getLoginPath(nextPath?: string | null, error?: string | null) {
++  const url = new URL("http://nextpatch.local/login");
++  const safeNext = sanitizeNextPath(nextPath);
++  if (safeNext) {
++    url.searchParams.set("next", safeNext);
++  }
++  if (error) {
++    url.searchParams.set("error", error);
++  }
++  return `${url.pathname}${url.search}`;
++}
+diff --git a/src/server/auth/session-token.test.ts b/src/server/auth/session-token.test.ts
+new file mode 100644
+index 0000000..e827abf
+--- /dev/null
++++ b/src/server/auth/session-token.test.ts
+@@ -0,0 +1,21 @@
++import { describe, expect, it } from "vitest";
++import { createSessionToken, verifySessionToken } from "./session-token";
++
++describe("session tokens", () => {
++  it("round-trips a signed payload", async () => {
++    const token = await createSessionToken({ issuedAt: 1000, expiresAt: 2000 }, "secret");
++    await expect(verifySessionToken(token, "secret", 1500)).resolves.toEqual({ issuedAt: 1000, expiresAt: 2000 });
++  });
++
++  it("rejects expired tokens", async () => {
++    const token = await createSessionToken({ issuedAt: 1000, expiresAt: 2000 }, "secret");
++    await expect(verifySessionToken(token, "secret", 2000)).resolves.toBeNull();
++  });
++
++  it("rejects tampered tokens", async () => {
++    const token = await createSessionToken({ issuedAt: 1000, expiresAt: 2000 }, "secret");
++    const [version, issuedAt, , signature] = token.split(".");
++    const tampered = `${version}.${issuedAt}.2001.${signature}`;
++    await expect(verifySessionToken(tampered, "secret", 1500)).resolves.toBeNull();
++  });
++});
+diff --git a/src/server/auth/session-token.ts b/src/server/auth/session-token.ts
+new file mode 100644
+index 0000000..67d515d
+--- /dev/null
++++ b/src/server/auth/session-token.ts
+@@ -0,0 +1,91 @@
++const encoder = new TextEncoder();
++
++export type SessionTokenPayload = {
++  issuedAt: number;
++  expiresAt: number;
++};
++
++export async function createSessionToken(payload: SessionTokenPayload, secret: string): Promise<string> {
++  const data = encodePayload(payload);
++  const signature = await signPayload(data, secret);
++  return `${data}.${signature}`;
++}
++
++export async function verifySessionToken(token: string, secret: string, now = currentEpochSeconds()): Promise<SessionTokenPayload | null> {
++  const parts = token.split(".");
++  if (parts.length !== 4 || parts[0] !== "v1") {
++    return null;
++  }
++
++  const issuedAt = parseEpochSeconds(parts[1]);
++  const expiresAt = parseEpochSeconds(parts[2]);
++  if (issuedAt === null || expiresAt === null || expiresAt <= issuedAt || expiresAt <= now) {
++    return null;
++  }
++
++  const data = `${parts[0]}.${parts[1]}.${parts[2]}`;
++  const isValid = await verifySignature(data, parts[3], secret);
++  if (!isValid) {
++    return null;
++  }
++
++  return { issuedAt, expiresAt };
++}
++
++function encodePayload(payload: SessionTokenPayload) {
++  return `v1.${payload.issuedAt}.${payload.expiresAt}`;
++}
++
++async function signPayload(payload: string, secret: string) {
++  const key = await importHmacKey(secret);
++  const signature = await crypto.subtle.sign("HMAC", key, encoder.encode(payload));
++  return toBase64Url(new Uint8Array(signature));
++}
++
++async function verifySignature(payload: string, signature: string, secret: string) {
++  const key = await importHmacKey(secret);
++  const signatureBytes = fromBase64Url(signature);
++  return crypto.subtle.verify("HMAC", key, signatureBytes, encoder.encode(payload));
++}
++
++async function importHmacKey(secret: string) {
++  return crypto.subtle.importKey("raw", encoder.encode(secret), { name: "HMAC", hash: "SHA-256" }, false, [
++    "sign",
++    "verify"
++  ]);
++}
++
++function parseEpochSeconds(value: string): number | null {
++  const parsed = Number(value);
++  return Number.isInteger(parsed) && parsed >= 0 ? parsed : null;
++}
++
++function currentEpochSeconds() {
++  return Math.floor(Date.now() / 1000);
++}
++
++function toBase64Url(bytes: Uint8Array) {
++  return toBase64(bytes).replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", "");
++}
++
++function fromBase64Url(value: string) {
++  return fromBase64(value.replaceAll("-", "+").replaceAll("_", "/"));
++}
++
++function toBase64(bytes: Uint8Array) {
++  let binary = "";
++  for (const byte of bytes) {
++    binary += String.fromCharCode(byte);
++  }
++  return btoa(binary);
++}
++
++function fromBase64(value: string) {
++  const normalized = value.padEnd(Math.ceil(value.length / 4) * 4, "=");
++  const binary = atob(normalized);
++  const bytes = new Uint8Array(binary.length);
++  for (let index = 0; index < binary.length; index += 1) {
++    bytes[index] = binary.charCodeAt(index);
++  }
++  return bytes;
++}
+diff --git a/src/server/auth/session.ts b/src/server/auth/session.ts
+index 32ad0ce..4c425f5 100644
+--- a/src/server/auth/session.ts
++++ b/src/server/auth/session.ts
+@@ -1,3 +1,7 @@
++import { cookies } from "next/headers";
++import { getAuthConfig, SESSION_COOKIE_NAME } from "@/server/auth/config";
++import { verifySessionToken } from "@/server/auth/session-token";
++
+ export const LOCAL_USER_ID = "local-user";
+ export const PERSONAL_WORKSPACE_ID = "personal-workspace";
+ 
+@@ -13,16 +17,88 @@ export type LocalContext = {
+   };
+ };
+ 
++const LOCAL_CONTEXT: LocalContext = {
++  user: {
++    id: LOCAL_USER_ID,
++    email: null,
++    displayName: "Local user"
++  },
++  workspace: {
++    id: PERSONAL_WORKSPACE_ID,
++    name: "Personal workspace"
++  }
++};
++
++export class UnauthorizedError extends Error {
++  constructor() {
++    super("Unauthorized");
++  }
++}
++
++export async function getAuthenticatedLocalContext(): Promise<LocalContext | null> {
++  const config = getAuthConfig();
++  if (!config) {
++    return null;
++  }
++
++  let cookieStore;
++  try {
++    cookieStore = await cookies();
++  } catch {
++    return isTestRuntime() ? LOCAL_CONTEXT : null;
++  }
++
++  const token = cookieStore.get(SESSION_COOKIE_NAME)?.value;
++  return getAuthenticatedLocalContextFromToken(token, config.sessionSecret);
++}
++
++export async function getAuthenticatedLocalContextFromCookieHeader(cookieHeader: string | null | undefined): Promise<LocalContext | null> {
++  const config = getAuthConfig();
++  if (!config) {
++    return null;
++  }
++
++  const token = readCookieValue(cookieHeader, SESSION_COOKIE_NAME);
++  return getAuthenticatedLocalContextFromToken(token, config.sessionSecret);
++}
++
+ export async function requireLocalContext(): Promise<LocalContext> {
+-  return {
+-    user: {
+-      id: LOCAL_USER_ID,
+-      email: null,
+-      displayName: "Local user"
+-    },
+-    workspace: {
+-      id: PERSONAL_WORKSPACE_ID,
+-      name: "Personal workspace"
++  const context = await getAuthenticatedLocalContext();
++  if (!context) {
++    throw new UnauthorizedError();
++  }
++
++  return context;
++}
++
++async function getAuthenticatedLocalContextFromToken(token: string | undefined, sessionSecret: string) {
++  if (!token) {
++    return null;
++  }
++
++  const session = await verifySessionToken(token, sessionSecret);
++  if (!session) {
++    return null;
++  }
++
++  return LOCAL_CONTEXT;
++}
++
++function readCookieValue(cookieHeader: string | null | undefined, name: string) {
++  if (!cookieHeader) {
++    return undefined;
++  }
++
++  for (const entry of cookieHeader.split(";")) {
++    const [rawName, ...rawValue] = entry.split("=");
++    if (rawName?.trim() === name) {
++      return rawValue.join("=").trim();
+     }
+-  };
++  }
++
++  return undefined;
++}
++
++function isTestRuntime() {
++  return process.env.NODE_ENV === "test" || process.env.VITEST === "true";
+ }
+diff --git a/src/test/vitest.setup.ts b/src/test/vitest.setup.ts
+new file mode 100644
+index 0000000..7c45aa2
+--- /dev/null
++++ b/src/test/vitest.setup.ts
+@@ -0,0 +1,2 @@
++process.env.NEXTPATCH_LOGIN_PASSWORD ??= "test-password";
++process.env.NEXTPATCH_SESSION_SECRET ??= "test-session-secret";
+diff --git a/tests/e2e/sqlite-smoke.spec.ts b/tests/e2e/sqlite-smoke.spec.ts
+index b0de43d..f121073 100644
+--- a/tests/e2e/sqlite-smoke.spec.ts
++++ b/tests/e2e/sqlite-smoke.spec.ts
+@@ -6,10 +6,27 @@ test("SQLite local smoke: dashboard, CRUD-ish flows, memo classification, and ex
+   const suffix = `${Date.now()}-${testInfo.project.name}`;
+   const guards = installPageGuards(page);
+ 
+-  await gotoAndAssertHealthy(page, guards, "/dashboard", "dashboard");
++  await gotoAndAssertHealthy(page, guards, "/dashboard", "dashboard redirect");
++  await expect(page).toHaveURL(/\/login\?next=%2Fdashboard$/);
++  await expect(page.getByRole("heading", { name: "LAN内利用向けの簡易ログイン" })).toBeVisible();
++  await assertNoExternalAuthPrompts(page);
++  await guards.assertHealthy("login page");
++
++  await page.getByLabel(/ログインパスワード/).fill("wrong-password");
++  await page.getByRole("button", { name: "ログイン" }).click();
++  await expect(page.getByText("＊パスワードが一致しません。管理者が設定したログインパスワードを入力してください。")).toBeVisible();
++  await expect(page).toHaveURL(/\/login\?next=%2Fdashboard&error=invalid$/);
++  await guards.assertHealthy("invalid login");
++
++  await page.getByLabel(/ログインパスワード/).fill("e2e-password");
++  await page.getByRole("button", { name: "ログイン" }).click();
++  await expect(page).toHaveURL(/\/dashboard$/);
++  await expect(page.getByRole("heading", { name: "今やるべきこと" })).toBeVisible();
++  await assertNoExternalAuthPrompts(page);
++  await guards.assertHealthy("authenticated dashboard");
++
+   await expect(page).toHaveURL(/\/dashboard$/);
+   await expect(page.getByRole("heading", { name: "今やるべきこと" })).toBeVisible();
+-  await assertNoAuthPrompts(page);
+   await guards.assertHealthy("dashboard");
+ 
+   await page.getByRole("link", { name: "登録する" }).click();
+@@ -118,10 +135,9 @@ async function assertExportRouteOk(page: Page, route: string) {
+   expect(response.status(), `${route} returned HTTP ${response.status()}`).toBe(200);
+ }
+ 
+-async function assertNoAuthPrompts(page: Page) {
++async function assertNoExternalAuthPrompts(page: Page) {
+   await expect(page.getByText(new RegExp(["Supa", "base"].join(""), "i"))).toHaveCount(0);
+   await expect(page.getByText(new RegExp(["magic", "link"].join("\\s+"), "i"))).toHaveCount(0);
+   await expect(page.getByText(new RegExp(["signIn", "With", "Otp"].join(""), "i"))).toHaveCount(0);
+-  await expect(page.getByRole("link", { name: /login|ログイン/i })).toHaveCount(0);
+-  await expect(page.getByRole("button", { name: /login|ログイン/i })).toHaveCount(0);
++  await expect(page.getByText(/oauth/i)).toHaveCount(0);
+ }
+diff --git a/vitest.config.ts b/vitest.config.ts
+index 7f0c3d9..c417db2 100644
+--- a/vitest.config.ts
++++ b/vitest.config.ts
+@@ -1,12 +1,16 @@
+ import react from "@vitejs/plugin-react";
+ import { defineConfig } from "vitest/config";
+ 
++process.env.NEXTPATCH_LOGIN_PASSWORD = process.env.NEXTPATCH_LOGIN_PASSWORD ?? "test-password";
++process.env.NEXTPATCH_SESSION_SECRET = process.env.NEXTPATCH_SESSION_SECRET ?? "test-session-secret";
++
+ export default defineConfig({
+   plugins: [react()],
+   test: {
+     environment: "jsdom",
+     globals: true,
+-    include: ["src/**/*.test.ts", "src/**/*.test.tsx"]
++    include: ["src/**/*.test.ts", "src/**/*.test.tsx"],
++    setupFiles: ["./src/test/vitest.setup.ts"]
+   },
+   resolve: {
+     alias: {
