@@ -2,7 +2,7 @@
 
 NextPatch is a self-managed local server web app for organizing repository work, bugs, ideas, implementation notes, ChatGPT paste notes, and the next action to take.
 
-The MVP is a local single-user build. It has no built-in access control, so it binds to localhost by default and should not be exposed on a LAN or the public internet without an external protection layer. GitHub integration is limited to URL parsing, and ChatGPT integration is limited to manual paste plus local JSON/Markdown parsing.
+The MVP is a local single-user build with a simple password login. It still binds to localhost by default and should not be exposed on a LAN or the public internet without an external protection layer. GitHub integration is limited to URL parsing, and ChatGPT integration is limited to manual paste plus local JSON/Markdown parsing.
 
 ## Requirements
 
@@ -21,6 +21,7 @@ pnpm dev
 ```
 
 Open `http://localhost:3000`. The app uses a local single-user context during the SQLite migration.
+Set `NEXTPATCH_LOGIN_PASSWORD` and `NEXTPATCH_SESSION_SECRET` before using the login form.
 If you need a clean local database, run `pnpm db:reset:dev` first. It removes only the SQLite file plus `-wal` and `-shm` sidecars and respects `NEXTPATCH_DB_PATH` when set.
 
 ## Daily Local Server Startup
@@ -78,10 +79,10 @@ For a clean local restart, stop the app, remove the SQLite database with `pnpm d
 
 ## Login Route
 
-`/login` is kept only as a bookmark-safe redirect to `/dashboard`. It is not a login feature, and the SQLite local MVP does not include email sign-in or an auth callback.
+`/login` is the local password login surface. It uses a signed HttpOnly cookie session and redirects authenticated users to `/dashboard`.
 
 ## External Exposure
 
 External publication is not recommended for the MVP.
-The app is a local single-user build with access control not implemented, so exposing it on a LAN is unsafe unless you add your own protection layer.
+The app is a local single-user build with password-based access control, so exposing it on a LAN still needs HTTPS, a strong password, and a trusted network boundary.
 The default compose port binding is local-only; if you change it for LAN exposure, add HTTPS, an explicit access-control layer, regular JSON exports, DB volume backups, and firewall rules first.
