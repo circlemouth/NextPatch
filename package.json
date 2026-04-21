@@ -13,6 +13,7 @@
     "db:seed": "tsx src/server/db/seed.ts",
     "db:init": "node scripts/db-init.mjs",
     "db:reset:dev": "node scripts/reset-dev-db.mjs && pnpm db:migrate && pnpm db:seed",
+    "test:e2e:server": "tsx scripts/e2e/web-server.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test"

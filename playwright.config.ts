@@ -14,8 +14,8 @@ export default defineConfig({
     { name: "mobile-chrome", use: { ...devices["Pixel 5"] } }
   ],
   webServer: {
-    command: "pnpm dev",
-    url: "http://127.0.0.1:3000/login",
+    command: "pnpm test:e2e:server",
+    url: "http://127.0.0.1:3000/dashboard",
     reuseExistingServer: !process.env.CI,
     timeout: 120_000
   }
