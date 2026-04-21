@@ -1,13 +1,14 @@
 "use server";
 
 import { requireSession } from "@/server/auth/session";
+import { createClassificationCandidates, createWorkItem } from "@/server/db/queries/context";
 import { parseImportContent } from "@/server/domain/import-parser";
 import { quickCaptureSchema } from "@/server/validation/schemas";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 export async function quickCapture(formData: FormData) {
-  const { supabase, user, workspace } = await requireSession();
+  const { user, workspace } = await requireSession();
   const parsed = quickCaptureSchema.parse({
     repositoryId: formData.get("repositoryId") || "",
     type: formData.get("type") || "auto",
@@ -23,31 +24,23 @@ export async function quickCapture(formData: FormData) {
   const title = parsed.title || firstLine(parsed.body);
   const importResult = parseImportContent(parsed.body);
 
-  const { data: memo, error } = await supabase
-    .from("work_items")
-    .insert({
-      workspace_id: workspace.id,
-      user_id: user.id,
-      repository_id: repositoryId,
-      scope,
-      type,
-      title,
-      body: parsed.body,
-      status: type === "memo" ? "unreviewed" : "todo",
-      priority: "p2",
-      source_type: parsed.sourceType === "chatgpt" ? "chatgpt" : "manual",
-      privacy_level: parsed.privacyLevel,
-      is_pinned: parsed.isPinned
-    })
-    .select("id")
-    .single();
-
-  if (error) {
-    throw error;
-  }
+  const memo = createWorkItem({
+    workspace_id: workspace.id,
+    user_id: user.id,
+    repository_id: repositoryId,
+    scope,
+    type,
+    title,
+    body: parsed.body,
+    status: type === "memo" ? "unreviewed" : "todo",
+    priority: "p2",
+    source_type: parsed.sourceType === "chatgpt" ? "chatgpt" : "manual",
+    privacy_level: parsed.privacyLevel,
+    is_pinned: parsed.isPinned
+  });
 
   if (importResult.candidates.length > 0) {
-    await supabase.from("classification_candidates").insert(
+    createClassificationCandidates(
       importResult.candidates.map((candidate) => ({
         workspace_id: workspace.id,
         user_id: user.id,

@@ -1,6 +1,6 @@
 import { createWorkItem, updateWorkItemStatus } from "@/server/actions/work-items";
 import { requireSession } from "@/server/auth/session";
-import type { RepositoryRow, WorkItemRow } from "@/server/types";
+import { getRepository, listWorkItems } from "@/server/db/queries/context";
 
 type RepositoryDetailPageProps = {
   params: Promise<{ repositoryId: string }>;
@@ -8,27 +8,9 @@ type RepositoryDetailPageProps = {
 
 export default async function RepositoryDetailPage({ params }: RepositoryDetailPageProps) {
   const { repositoryId } = await params;
-  const { supabase, workspace } = await requireSession();
-  const [{ data: repository, error: repositoryError }, { data: items, error: itemsError }] = await Promise.all([
-    supabase.from("repositories").select("*").eq("workspace_id", workspace.id).eq("id", repositoryId).single(),
-    supabase
-      .from("work_items")
-      .select("*")
-      .eq("workspace_id", workspace.id)
-      .eq("repository_id", repositoryId)
-      .is("deleted_at", null)
-      .order("updated_at", { ascending: false })
-  ]);
-
-  if (repositoryError) {
-    throw repositoryError;
-  }
-  if (itemsError) {
-    throw itemsError;
-  }
-
-  const repo = repository as RepositoryRow;
-  const workItems = (items ?? []) as WorkItemRow[];
+  const { workspace } = await requireSession();
+  const repo = getRepository(workspace.id, repositoryId);
+  const workItems = listWorkItems({ workspaceId: workspace.id, repositoryId });
 
   return (
     <main className="page">

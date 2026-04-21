@@ -1,17 +1,9 @@
 import { requireSession } from "@/server/auth/session";
-import type { WorkItemRow } from "@/server/types";
+import { listWorkItems } from "@/server/db/queries/context";
 
 export default async function IdeasPage() {
-  const { supabase, workspace } = await requireSession();
-  const { data, error } = await supabase
-    .from("work_items")
-    .select("*")
-    .eq("workspace_id", workspace.id)
-    .in("type", ["idea", "future_feature", "implementation"])
-    .is("deleted_at", null)
-    .order("updated_at", { ascending: false });
-
-  if (error) throw error;
+  const { workspace } = await requireSession();
+  const items = listWorkItems({ workspaceId: workspace.id, types: ["idea", "future_feature", "implementation"] });
 
   return (
     <main className="page">
@@ -21,7 +13,7 @@ export default async function IdeasPage() {
       </header>
       <section className="panel">
         <div className="card-list">
-          {((data ?? []) as WorkItemRow[]).map((item) => (
+          {items.map((item) => (
             <article className="item-card" key={item.id}>
               <h2>{item.title}</h2>
               <div className="meta-row">

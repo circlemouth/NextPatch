@@ -13,9 +13,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
         <div className="page-header">
           <p className="eyebrow">Private local server</p>
           <h1 id="login-title">NextPatch にログイン</h1>
-          <p className="support">
-            ローカル環境でも認証は必須です。Supabase Auth の magic link でログインします。
-          </p>
+          <p className="support">ローカル運用では固定の local-user で利用します。</p>
         </div>
         {params.message ? <p className="banner">{params.message}</p> : null}
         <form action={signInWithEmail} className="form-stack">
@@ -23,11 +21,11 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
             <label htmlFor="email">
               メールアドレス<span className="required">※必須</span>
             </label>
-            <p className="support">Supabase Auth に登録するメールアドレスを入力してください。</p>
+            <p className="support">現在はローカルユーザーとしてそのまま開始します。</p>
             <input id="email" name="email" type="email" autoComplete="email" />
           </div>
           <button className="button" type="submit">
-            magic link を送信
+            開始する
           </button>
         </form>
       </section>
