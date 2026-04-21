@@ -82,7 +82,6 @@ Supabase / PostgreSQL 前提を使わず、NextPatch のローカル継続運用
    - PRAGMA journal_mode = WAL
    - PRAGMA busy_timeout = 5000
 7. package scripts 候補を追加する。
-   - db:generate
    - db:migrate
    - db:seed
    - db:reset:dev
