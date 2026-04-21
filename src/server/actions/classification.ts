@@ -8,7 +8,7 @@ import { redirect } from "next/navigation";
 
 export async function classifyMemo(formData: FormData) {
   const { user, workspace } = await requireLocalContext();
-  const parsed = classifyMemoSchema.parse({
+  const parsedResult = classifyMemoSchema.safeParse({
     memoId: formData.get("memoId"),
     targetType: formData.get("targetType"),
     repositoryId: formData.get("repositoryId") || "",
@@ -16,6 +16,10 @@ export async function classifyMemo(formData: FormData) {
     body: formData.get("body") || undefined,
     priority: formData.get("priority") || "p2"
   });
+  if (!parsedResult.success) {
+    throw new Error(parsedResult.error.issues.map((issue) => issue.message).join(" "));
+  }
+  const parsed = parsedResult.data;
   const repositoryId = parsed.repositoryId || null;
 
   await classifyMemoCommand({

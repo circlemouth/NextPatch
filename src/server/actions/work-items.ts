@@ -9,7 +9,7 @@ import { redirect } from "next/navigation";
 
 export async function createWorkItem(formData: FormData) {
   const { user, workspace } = await requireLocalContext();
-  const parsed = workItemSchema.parse({
+  const parsedResult = workItemSchema.safeParse({
     repositoryId: formData.get("repositoryId") || "",
     type: formData.get("type"),
     title: formData.get("title"),
@@ -19,6 +19,10 @@ export async function createWorkItem(formData: FormData) {
     isPinned: formData.get("isPinned") === "on",
     externalUrl: formData.get("externalUrl") || undefined
   });
+  if (!parsedResult.success) {
+    throw new Error(parsedResult.error.issues.map((issue) => issue.message).join(" "));
+  }
+  const parsed = parsedResult.data;
   const repositoryId = parsed.repositoryId || null;
   const scope = repositoryId ? "repository" : parsed.type === "memo" ? "inbox" : "global";
 
@@ -47,6 +51,9 @@ export async function updateWorkItemStatus(formData: FormData) {
   const { user, workspace } = await requireLocalContext();
   const id = String(formData.get("id") ?? "");
   const status = String(formData.get("status") ?? "");
+  if (!id || !status) {
+    throw new Error("Work item status update requires id and status");
+  }
   await updateWorkItemStatusCommand(workspace.id, user.id, id, status);
 
   revalidatePath("/dashboard");

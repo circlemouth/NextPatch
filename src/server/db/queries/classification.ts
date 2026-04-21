@@ -5,6 +5,7 @@ import { defaultStatus } from "@/server/domain/work-item-defaults";
 import type { ImportCandidate, ImportParseResult } from "@/server/domain/import-parser";
 import type { PrivacyLevel, SourceType, WorkItemScope, WorkItemType } from "@/server/types";
 import { assertPersonalWorkspaceScope } from "./context";
+import { applyStatusTimestamps } from "@/server/domain/status";
 
 type QuickCaptureInput = {
   workspaceId: string;
@@ -48,7 +49,7 @@ export async function quickCaptureCommand(input: QuickCaptureInput) {
         type: input.type,
         title: input.title,
         body: input.body,
-        status: input.type === "memo" ? "unreviewed" : "todo",
+        status: defaultStatus(input.type),
         priority: "p2",
         sourceType: input.sourceType,
         privacyLevel: input.privacyLevel,
@@ -79,6 +80,28 @@ export async function classifyMemoCommand(input: ClassifyMemoInput) {
   const now = new Date().toISOString();
 
   getDb().transaction((tx) => {
+    const memo = tx
+      .select()
+      .from(workItems)
+      .where(eq(workItems.id, input.memoId))
+      .get();
+
+    if (!memo) {
+      throw new Error(`Unreviewed memo not found: ${input.memoId}`);
+    }
+
+    if (memo.workspaceId !== input.workspaceId) {
+      throw new Error(`Memo belongs to another workspace: ${input.memoId}`);
+    }
+
+    if (memo.type !== "memo") {
+      throw new Error(`Work item is not a memo: ${input.memoId}`);
+    }
+
+    if (memo.status !== "unreviewed") {
+      throw new Error(`Memo is already classified: ${input.memoId}`);
+    }
+
     tx.insert(workItems)
       .values({
         id,
@@ -100,16 +123,39 @@ export async function classifyMemoCommand(input: ClassifyMemoInput) {
       })
       .run();
 
-    tx.update(workItems)
+    const timestamps = applyStatusTimestamps(
+      {
+        type: memo.type as WorkItemType,
+        status: memo.status,
+        completed_at: memo.completedAt,
+        closed_at: memo.closedAt
+      },
+      "itemized",
+      now
+    );
+
+    const result = tx
+      .update(workItems)
       .set({
         status: "itemized",
-        completedAt: now,
-        closedAt: now,
-        statusChangedAt: now,
+        completedAt: timestamps.completed_at,
+        closedAt: timestamps.closed_at,
+        statusChangedAt: timestamps.status_changed_at,
         updatedAt: now
       })
-      .where(and(eq(workItems.workspaceId, input.workspaceId), eq(workItems.id, input.memoId)))
+      .where(
+        and(
+          eq(workItems.workspaceId, input.workspaceId),
+          eq(workItems.id, input.memoId),
+          eq(workItems.type, "memo"),
+          eq(workItems.status, "unreviewed")
+        )
+      )
       .run();
+
+    if (result.changes !== 1) {
+      throw new Error(`Failed to itemize memo: ${input.memoId}`);
+    }
   });
 
   return id;

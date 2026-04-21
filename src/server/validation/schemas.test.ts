@@ -52,4 +52,15 @@ describe("classifyMemoSchema", () => {
     expect(result.targetType).toBe("bug");
     expect(result.repositoryId).toBeUndefined();
   });
+
+  it("rejects memo as a classification target", () => {
+    expect(() =>
+      classifyMemoSchema.parse({
+        memoId: "550e8400-e29b-41d4-a716-446655440000",
+        targetType: "memo",
+        title: "Memo target",
+        priority: "p1"
+      })
+    ).toThrow();
+  });
 });

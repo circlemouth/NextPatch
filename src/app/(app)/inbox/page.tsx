@@ -37,7 +37,6 @@ export default async function InboxPage() {
                       <option value="idea">idea</option>
                       <option value="implementation">implementation</option>
                       <option value="future_feature">future_feature</option>
-                      <option value="memo">memo</option>
                     </select>
                   </div>
                   <div className="field">

@@ -1,7 +1,7 @@
-import { and, desc, eq, inArray, isNull } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, type SQL } from "drizzle-orm";
 import { getDb } from "@/server/db/client";
 import { repositories, statusHistories, workItems } from "@/server/db/schema";
-import { applyStatusTimestamps } from "@/server/domain/status";
+import { applyStatusTimestamps, assertAllowedWorkItemStatus } from "@/server/domain/status";
 import type { Priority, PrivacyLevel, SourceType, WorkItemRow, WorkItemScope, WorkItemType } from "@/server/types";
 import { assertPersonalWorkspaceScope } from "./context";
 import { toWorkItemRow } from "./mappers";
@@ -64,18 +64,29 @@ export async function updateWorkItemStatusCommand(workspaceId: string, userId: s
     const item = tx
       .select()
       .from(workItems)
-      .where(and(eq(workItems.workspaceId, workspaceId), eq(workItems.id, id)))
+      .where(eq(workItems.id, id))
       .get();
 
     if (!item) {
       throw new Error(`Work item not found: ${id}`);
     }
 
+    if (item.workspaceId !== workspaceId) {
+      throw new Error(`Work item belongs to another workspace: ${id}`);
+    }
+
+    if (item.deletedAt) {
+      throw new Error(`Work item not found: ${id}`);
+    }
+
     const row = toWorkItemRow(item);
     const now = new Date().toISOString();
+
+    assertAllowedWorkItemStatus(row.type, status);
     const timestamps = applyStatusTimestamps(row, status, now);
 
-    tx.update(workItems)
+    const result = tx
+      .update(workItems)
       .set({
         status,
         completedAt: timestamps.completed_at,
@@ -83,8 +94,12 @@ export async function updateWorkItemStatusCommand(workspaceId: string, userId: s
         statusChangedAt: timestamps.status_changed_at,
         updatedAt: now
       })
-      .where(and(eq(workItems.workspaceId, workspaceId), eq(workItems.id, id)))
+      .where(and(eq(workItems.workspaceId, workspaceId), eq(workItems.id, id), eq(workItems.status, item.status)))
       .run();
+
+    if (result.changes !== 1) {
+      throw new Error(`Failed to update work item status: ${id}`);
+    }
 
     tx.insert(statusHistories)
       .values({
@@ -111,6 +126,11 @@ export async function listWorkItemsByTypes(workspaceId: string, types: WorkItemT
 }
 
 export async function listMemoWorkItems(workspaceId: string): Promise<WorkItemRow[]> {
+  assertPersonalWorkspaceScope(workspaceId);
+  return selectWorkItems(workspaceId, eq(workItems.type, "memo"), eq(workItems.status, "unreviewed"));
+}
+
+export async function listAllMemoWorkItems(workspaceId: string): Promise<WorkItemRow[]> {
   assertPersonalWorkspaceScope(workspaceId);
   return selectWorkItems(workspaceId, eq(workItems.type, "memo"));
 }
@@ -139,11 +159,9 @@ export async function getWorkItemById(workspaceId: string, id: string): Promise<
   return row ? toWorkItemRow(row.item, row.repository) : null;
 }
 
-function selectWorkItems(workspaceId: string, extraCondition?: ReturnType<typeof eq> | ReturnType<typeof inArray>) {
+function selectWorkItems(workspaceId: string, ...extraConditions: SQL[]) {
   const conditions = [eq(workItems.workspaceId, workspaceId), isNull(workItems.deletedAt)];
-  if (extraCondition) {
-    conditions.push(extraCondition);
-  }
+  conditions.push(...extraConditions);
 
   const rows = getDb()
     .select({

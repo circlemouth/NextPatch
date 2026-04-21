@@ -9,7 +9,7 @@ import { redirect } from "next/navigation";
 
 export async function quickCapture(formData: FormData) {
   const { user, workspace } = await requireLocalContext();
-  const parsed = quickCaptureSchema.parse({
+  const parsedResult = quickCaptureSchema.safeParse({
     repositoryId: formData.get("repositoryId") || "",
     type: formData.get("type") || "auto",
     title: formData.get("title") || undefined,
@@ -18,6 +18,10 @@ export async function quickCapture(formData: FormData) {
     isPinned: formData.get("isPinned") === "on",
     sourceType: formData.get("sourceType") || "manual"
   });
+  if (!parsedResult.success) {
+    throw new Error(parsedResult.error.issues.map((issue) => issue.message).join(" "));
+  }
+  const parsed = parsedResult.data;
   const type = parsed.type === "auto" ? "memo" : parsed.type;
   const repositoryId = parsed.repositoryId || null;
   const scope = repositoryId ? "repository" : type === "memo" ? "inbox" : "global";
