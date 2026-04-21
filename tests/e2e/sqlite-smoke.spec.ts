@@ -37,7 +37,11 @@ test("SQLite local smoke: dashboard, CRUD-ish flows, memo classification, and ex
 
   await gotoAndAssertHealthy(page, guards, "/work-items", "work items refresh");
   const workItemCard = page.locator("article").filter({ has: page.getByRole("heading", { name: `QA Bug ${suffix}` }) });
-  await workItemCard.getByRole("button", { name: "完了扱いにする" }).click();
+  await workItemCard.getByRole("button", { name: "確認済みにする" }).click();
+  await expect(workItemCard.getByText("confirmed")).toBeVisible();
+  await workItemCard.getByRole("button", { name: "修正済み・確認待ち" }).click();
+  await expect(workItemCard.getByText("fixed_waiting")).toBeVisible();
+  await workItemCard.getByRole("button", { name: "解決済みにする" }).click();
   await expect(workItemCard.getByText("resolved")).toBeVisible();
   await guards.assertHealthy("work item status update");
 
