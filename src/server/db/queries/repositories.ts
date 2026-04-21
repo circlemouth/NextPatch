@@ -69,7 +69,7 @@ export async function listRepositories(workspaceId: string): Promise<RepositoryR
   const rows = getDb()
     .select()
     .from(repositories)
-    .where(and(eq(repositories.workspaceId, workspaceId), isNull(repositories.deletedAt)))
+    .where(and(eq(repositories.workspaceId, workspaceId), isNull(repositories.archivedAt), isNull(repositories.deletedAt)))
     .orderBy(desc(repositories.updatedAt))
     .all();
 
