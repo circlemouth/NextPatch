@@ -64,18 +64,10 @@ export async function updateWorkItemStatusCommand(workspaceId: string, userId: s
     const item = tx
       .select()
       .from(workItems)
-      .where(eq(workItems.id, id))
+      .where(and(eq(workItems.workspaceId, workspaceId), eq(workItems.id, id), isNull(workItems.deletedAt)))
       .get();
 
     if (!item) {
-      throw new Error(`Work item not found: ${id}`);
-    }
-
-    if (item.workspaceId !== workspaceId) {
-      throw new Error(`Work item belongs to another workspace: ${id}`);
-    }
-
-    if (item.deletedAt) {
       throw new Error(`Work item not found: ${id}`);
     }
 

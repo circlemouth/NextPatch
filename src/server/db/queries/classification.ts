@@ -1,11 +1,11 @@
 import { and, eq } from "drizzle-orm";
 import { getDb } from "@/server/db/client";
 import { classificationCandidates, workItems } from "@/server/db/schema";
+import { applyStatusTimestamps } from "@/server/domain/status";
 import { defaultStatus } from "@/server/domain/work-item-defaults";
 import type { ImportCandidate, ImportParseResult } from "@/server/domain/import-parser";
 import type { PrivacyLevel, SourceType, WorkItemScope, WorkItemType } from "@/server/types";
 import { assertPersonalWorkspaceScope } from "./context";
-import { applyStatusTimestamps } from "@/server/domain/status";
 
 type QuickCaptureInput = {
   workspaceId: string;
@@ -83,15 +83,11 @@ export async function classifyMemoCommand(input: ClassifyMemoInput) {
     const memo = tx
       .select()
       .from(workItems)
-      .where(eq(workItems.id, input.memoId))
+      .where(and(eq(workItems.workspaceId, input.workspaceId), eq(workItems.id, input.memoId)))
       .get();
 
     if (!memo) {
       throw new Error(`Unreviewed memo not found: ${input.memoId}`);
-    }
-
-    if (memo.workspaceId !== input.workspaceId) {
-      throw new Error(`Memo belongs to another workspace: ${input.memoId}`);
     }
 
     if (memo.type !== "memo") {

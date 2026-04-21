@@ -75,7 +75,7 @@ describe("SQLite workspace guardrails", () => {
         title: "Wrong workspace",
         priority: "p2"
       })
-    ).rejects.toThrow("Memo belongs to another workspace");
+    ).rejects.toThrow("Unreviewed memo not found");
   });
 
   it("rejects status updates from another workspace", async () => {
@@ -95,7 +95,7 @@ describe("SQLite workspace guardrails", () => {
     });
 
     await expect(updateWorkItemStatusCommand(ctx.otherWorkspaceId, ctx.userId, itemId, "done")).rejects.toThrow(
-      "Work item belongs to another workspace"
+      "Work item not found"
     );
   });
 });
