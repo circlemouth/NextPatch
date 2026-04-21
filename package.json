@@ -13,6 +13,7 @@
     "db:migrate": "tsx src/server/db/migrate.ts",
     "db:seed": "tsx src/server/db/seed.ts",
     "db:reset:dev": "node -e \"const fs=require('node:fs'); const p=process.env.NEXTPATCH_DB_PATH || '.data/nextpatch.sqlite'; for (const f of [p, `${p}-wal`, `${p}-shm`]) { try { fs.rmSync(f); } catch {} }\" && pnpm db:migrate && pnpm db:seed",
+    "test:e2e:server": "tsx scripts/e2e/web-server.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test"

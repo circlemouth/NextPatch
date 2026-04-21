@@ -4,15 +4,18 @@ test.describe.configure({ mode: "serial" });
 
 test("SQLite local smoke: dashboard, CRUD-ish flows, memo classification, and export links", async ({ page }, testInfo) => {
   const suffix = `${Date.now()}-${testInfo.project.name}`;
+  const guards = installPageGuards(page);
 
-  await gotoOrSkipUntilSQLiteUiExists(page, "/");
+  await gotoAndAssertHealthy(page, guards, "/dashboard", "dashboard");
   await expect(page).toHaveURL(/\/dashboard$/);
   await expect(page.getByRole("heading", { name: "今やるべきこと" })).toBeVisible();
+  await guards.assertHealthy("dashboard");
 
   await page.getByRole("link", { name: "登録する" }).click();
   await expect(page.getByRole("heading", { name: "クイック登録" })).toBeVisible();
+  await guards.assertHealthy("quick capture entry");
 
-  await page.goto("/repositories");
+  await gotoAndAssertHealthy(page, guards, "/repositories", "repositories");
   await expect(page.getByRole("heading", { name: "リポジトリ" })).toBeVisible();
   await page.getByLabel(/リポジトリ名/).fill(`QA Repo ${suffix}`);
   await page.getByLabel(/GitHub URL/).fill(`https://github.com/example/qa-${suffix}`);
@@ -20,41 +23,83 @@ test("SQLite local smoke: dashboard, CRUD-ish flows, memo classification, and ex
   await page.getByLabel(/重要度/).selectOption("high");
   await page.getByRole("button", { name: "保存" }).click();
   await expect(page.getByText(`QA Repo ${suffix}`)).toBeVisible();
+  await guards.assertHealthy("repository create");
 
-  await page.goto("/work-items");
+  await gotoAndAssertHealthy(page, guards, "/work-items", "work items");
   await expect(page.getByRole("heading", { name: "横断 WorkItem" })).toBeVisible();
   await page.getByLabel(/種類/).selectOption("bug");
   await page.getByLabel(/タイトル/).fill(`QA Bug ${suffix}`);
   await page.getByLabel(/本文/).fill("Created by SQLite QA smoke.");
   await page.getByRole("button", { name: "保存" }).click();
   await expect(page.getByText(`QA Bug ${suffix}`)).toBeVisible();
-  await page.goto("/work-items");
+  await guards.assertHealthy("work item create");
+
+  await gotoAndAssertHealthy(page, guards, "/work-items", "work items refresh");
   const workItemCard = page.locator("article").filter({ has: page.getByRole("heading", { name: `QA Bug ${suffix}` }) });
   await workItemCard.getByRole("button", { name: "完了扱いにする" }).click();
   await expect(workItemCard.getByText("resolved")).toBeVisible();
+  await guards.assertHealthy("work item status update");
 
-  await page.goto("/capture/new");
+  await gotoAndAssertHealthy(page, guards, "/capture/new", "capture new");
   await page.getByLabel(/本文/).fill(`QA memo ${suffix}\nClassify this memo.`);
   await page.getByRole("button", { name: "保存" }).click();
-  await page.goto("/inbox");
+  await guards.assertHealthy("capture memo create");
+
+  await gotoAndAssertHealthy(page, guards, "/inbox", "inbox");
   await expect(page.getByRole("heading", { name: `QA memo ${suffix}` })).toBeVisible();
   await page.getByLabel(/分類先/).first().selectOption("task");
   await page.getByLabel(/タイトル/).first().fill(`QA classified task ${suffix}`);
   await page.getByRole("button", { name: "分類して作成" }).first().click();
-  await page.goto("/work-items");
-  await expect(page.getByRole("heading", { name: `QA classified task ${suffix}` })).toBeVisible();
+  await guards.assertHealthy("memo classification");
 
-  await page.goto("/settings/data");
+  await gotoAndAssertHealthy(page, guards, "/work-items", "work items after classification");
+  await expect(page.getByRole("heading", { name: `QA classified task ${suffix}` })).toBeVisible();
+  await guards.assertHealthy("classified work item visible");
+
+  await gotoAndAssertHealthy(page, guards, "/settings/data", "settings data");
   await expect(page.getByRole("link", { name: "JSON export" })).toHaveAttribute("href", "/api/export/json");
   await expect(page.getByRole("link", { name: "Markdown export" })).toHaveAttribute("href", "/api/export/markdown");
   await expect(page.getByRole("link", { name: "CSV export" })).toHaveAttribute("href", "/api/export/csv");
+  await guards.assertHealthy("export links");
 });
 
-async function gotoOrSkipUntilSQLiteUiExists(page: Page, path: string) {
-  const response = await page.goto(path, { waitUntil: "domcontentloaded" });
+function installPageGuards(page: Page) {
+  const failures: string[] = [];
 
-  test.skip(
-    Boolean(response && response.status() >= 500),
-    "SQLite actions/UI are not integrated on this branch yet."
-  );
+  page.on("response", (response) => {
+    if (response.status() >= 500) {
+      failures.push(`${response.request().method()} ${response.url()} -> ${response.status()}`);
+    }
+  });
+
+  page.on("pageerror", (error) => {
+    failures.push(`pageerror: ${error.message}`);
+  });
+
+  page.on("console", (message) => {
+    if (message.type() === "error") {
+      const text = message.text();
+      if (isExpectedDevNoise(text)) {
+        return;
+      }
+      failures.push(`console.error: ${text}`);
+    }
+  });
+
+  return {
+    async assertHealthy(context: string) {
+      expect(failures, `${context} produced browser/runtime errors:\n${failures.join("\n")}`).toEqual([]);
+    }
+  };
+}
+
+function isExpectedDevNoise(text: string) {
+  return /WebSocket connection to .*\/_next\/webpack-hmr/i.test(text) || /Blocked cross-origin request to Next\.js dev resource .*\/_next\/webpack-hmr/i.test(text);
+}
+
+async function gotoAndAssertHealthy(page: Page, guards: ReturnType<typeof installPageGuards>, path: string, context: string) {
+  const response = await page.goto(path, { waitUntil: "domcontentloaded" });
+  expect(response, `${context} did not return an HTTP response`).not.toBeNull();
+  expect(response?.status(), `${context} returned HTTP ${response?.status() ?? "unknown"}`).toBeLessThan(500);
+  await guards.assertHealthy(context);
 }
