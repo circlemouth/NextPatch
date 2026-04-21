@@ -6,13 +6,20 @@ import Database from "better-sqlite3";
 const LOCAL_USER_ID = "local-user";
 const PERSONAL_WORKSPACE_ID = "personal-workspace";
 const DEFAULT_MIGRATION_DIR = path.resolve(process.cwd(), "drizzle");
+const DEFAULT_DATA_DIR = "./data";
+const DEFAULT_DB_FILE = "nextpatch.sqlite";
 
 function resolveRuntimePath(value) {
   return path.isAbsolute(value) ? value : path.join(process.cwd(), value);
 }
 
+function getDataDir() {
+  return resolveRuntimePath(process.env.NEXTPATCH_DATA_DIR ?? DEFAULT_DATA_DIR);
+}
+
 function getDatabasePath() {
-  return resolveRuntimePath(process.env.NEXTPATCH_DB_PATH ?? "./data/nextpatch.sqlite");
+  const explicitPath = process.env.NEXTPATCH_DB_PATH;
+  return explicitPath ? resolveRuntimePath(explicitPath) : path.join(getDataDir(), DEFAULT_DB_FILE);
 }
 
 function configureSqliteDatabase(database) {
@@ -44,10 +51,6 @@ function migrateDatabase(dbPath = getDatabasePath(), migrationDir = DEFAULT_MIGR
   try {
     const files = getMigrationFiles(migrationDir);
 
-    if (files.length === 0) {
-      throw new Error(`No migration SQL files found in ${migrationDir}`);
-    }
-
     sqlite.exec(`
       CREATE TABLE IF NOT EXISTS nextpatch_migrations (
         id TEXT PRIMARY KEY,
@@ -55,6 +58,20 @@ function migrateDatabase(dbPath = getDatabasePath(), migrationDir = DEFAULT_MIGR
         applied_at TEXT NOT NULL
       )
     `);
+
+    const appliedMigrations = sqlite
+      .prepare("select id, checksum from nextpatch_migrations order by id")
+      .all();
+    const fileSet = new Set(files);
+    const missingAppliedMigration = appliedMigrations.find((migration) => !fileSet.has(migration.id));
+
+    if (missingAppliedMigration) {
+      throw new Error(`Applied migration file is missing: ${missingAppliedMigration.id}`);
+    }
+
+    if (files.length === 0) {
+      throw new Error(`No migration SQL files found in ${migrationDir}`);
+    }
 
     const getAppliedMigration = sqlite.prepare(
       "select id, checksum from nextpatch_migrations where id = ?"

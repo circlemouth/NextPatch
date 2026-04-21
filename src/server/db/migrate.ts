@@ -23,10 +23,6 @@ export function migrateDatabase(dbPath = getDatabasePath(), migrationDir = DEFAU
   try {
     const files = getMigrationFiles(migrationDir);
 
-    if (files.length === 0) {
-      throw new Error(`No migration SQL files found in ${migrationDir}`);
-    }
-
     sqlite.exec(`
       CREATE TABLE IF NOT EXISTS nextpatch_migrations (
         id TEXT PRIMARY KEY,
@@ -34,6 +30,20 @@ export function migrateDatabase(dbPath = getDatabasePath(), migrationDir = DEFAU
         applied_at TEXT NOT NULL
       )
     `);
+
+    const appliedMigrations = sqlite
+      .prepare("select id, checksum from nextpatch_migrations order by id")
+      .all() as Array<{ id: string; checksum: string }>;
+    const fileSet = new Set(files);
+    const missingAppliedMigration = appliedMigrations.find((migration) => !fileSet.has(migration.id));
+
+    if (missingAppliedMigration) {
+      throw new Error(`Applied migration file is missing: ${missingAppliedMigration.id}`);
+    }
+
+    if (files.length === 0) {
+      throw new Error(`No migration SQL files found in ${migrationDir}`);
+    }
 
     const getAppliedMigration = sqlite.prepare(
       "select id, checksum from nextpatch_migrations where id = ?"
