@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { BackupDocument } from "./export";
-import { toCsvExport, toMarkdownExport, validateBackupJson } from "./export";
+import { buildBackupDocument, toCsvExport, toMarkdownExport, validateBackupJson } from "./export";
 
 const backup: BackupDocument = {
   format: "nextpatch.backup",
@@ -51,6 +51,23 @@ describe("validateBackupJson", () => {
 });
 
 describe("export formatting", () => {
+  it("builds a JSON backup with counts and a deterministic content hash", () => {
+    const built = buildBackupDocument({
+      workspaceId: "workspace-1",
+      exportedAt: "2026-04-21T00:00:00.000Z",
+      entities: backup.entities
+    });
+    const rebuilt = buildBackupDocument({
+      workspaceId: "workspace-1",
+      exportedAt: "2026-04-21T00:00:00.000Z",
+      entities: backup.entities
+    });
+
+    expect(built.integrity.counts).toMatchObject({ repositories: 1, workItems: 1 });
+    expect(built.integrity.contentHash).toMatch(/^sha256:[a-f0-9]{64}$/);
+    expect(rebuilt.integrity.contentHash).toBe(built.integrity.contentHash);
+  });
+
   it("renders markdown export with repository and work item summaries", () => {
     const markdown = toMarkdownExport(backup);
     expect(markdown).toContain("# NextPatch Export");

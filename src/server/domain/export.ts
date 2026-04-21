@@ -21,7 +21,7 @@ export type BackupDocument = {
   };
 };
 
-const entityTables = [
+export const backupEntityTables = [
   ["workspaces", "workspaces"],
   ["workspaceMembers", "workspace_members"],
   ["repositories", "repositories"],
@@ -37,11 +37,41 @@ const entityTables = [
   ["classificationCandidates", "classification_candidates"]
 ] as const;
 
+export function buildBackupDocument(input: {
+  workspaceId: string;
+  entities: Record<string, unknown[]>;
+  exportedAt?: string;
+}): BackupDocument {
+  const counts = Object.fromEntries(Object.entries(input.entities).map(([key, value]) => [key, value.length]));
+  const hashPayload = JSON.stringify({ entities: input.entities, counts });
+  const contentHash = `sha256:${crypto.createHash("sha256").update(hashPayload).digest("hex")}`;
+
+  return {
+    format: "nextpatch.backup",
+    schemaVersion: 1,
+    exportedAt: input.exportedAt ?? new Date().toISOString(),
+    app: { name: "NextPatch", version: "0.1.0" },
+    scope: { type: "workspace", workspaceId: input.workspaceId },
+    options: {
+      includeArchived: true,
+      includeDeleted: true,
+      includeAuditLogs: false,
+      includeAttachments: false,
+      redaction: "none"
+    },
+    entities: input.entities,
+    integrity: {
+      counts,
+      contentHash
+    }
+  };
+}
+
 export async function createBackupDocument(): Promise<BackupDocument> {
   const { supabase, workspace } = await requireSession();
   const entities: Record<string, unknown[]> = {};
 
-  for (const [entityName, tableName] of entityTables) {
+  for (const [entityName, tableName] of backupEntityTables) {
     const query = supabase.from(tableName).select("*");
     const { data, error } =
       tableName === "workspaces" ? await query.eq("id", workspace.id) : await query.eq("workspace_id", workspace.id);
@@ -51,29 +81,7 @@ export async function createBackupDocument(): Promise<BackupDocument> {
     entities[entityName] = data ?? [];
   }
 
-  const counts = Object.fromEntries(Object.entries(entities).map(([key, value]) => [key, value.length]));
-  const hashPayload = JSON.stringify({ entities, counts });
-  const contentHash = `sha256:${crypto.createHash("sha256").update(hashPayload).digest("hex")}`;
-
-  return {
-    format: "nextpatch.backup",
-    schemaVersion: 1,
-    exportedAt: new Date().toISOString(),
-    app: { name: "NextPatch", version: "0.1.0" },
-    scope: { type: "workspace", workspaceId: workspace.id },
-    options: {
-      includeArchived: true,
-      includeDeleted: true,
-      includeAuditLogs: false,
-      includeAttachments: false,
-      redaction: "none"
-    },
-    entities,
-    integrity: {
-      counts,
-      contentHash
-    }
-  };
+  return buildBackupDocument({ workspaceId: workspace.id, entities });
 }
 
 export function validateBackupJson(input: string) {

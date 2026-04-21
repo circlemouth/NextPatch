@@ -4,7 +4,15 @@ node_modules
 coverage
 playwright-report
 test-results
+data
 exports
+backups
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+*.db
+*.db-wal
+*.db-shm
 supabase/.temp
 .env
 .env.local
