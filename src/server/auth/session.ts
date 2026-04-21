@@ -1,62 +1,39 @@
-import { createServerSupabaseClient } from "@/server/supabase/server";
-import { redirect } from "next/navigation";
+export type LocalUser = {
+  id: "local-user";
+  email: null;
+  displayName: "Local user";
+};
 
-export async function requireSession() {
-  const supabase = await createServerSupabaseClient();
-  const {
-    data: { user },
-    error
-  } = await supabase.auth.getUser();
+export type LocalWorkspace = {
+  id: "personal-workspace";
+  name: "Personal workspace";
+};
 
-  if (error || !user) {
-    redirect("/login");
+export type LocalContext = {
+  user: LocalUser;
+  workspace: LocalWorkspace;
+};
+
+const localContext: LocalContext = {
+  user: {
+    id: "local-user",
+    email: null,
+    displayName: "Local user"
+  },
+  workspace: {
+    id: "personal-workspace",
+    name: "Personal workspace"
   }
+};
 
-  const workspace = await ensurePersonalWorkspace(user.id);
-
-  return { supabase, user, workspace };
+export async function requireLocalContext() {
+  return localContext;
 }
 
-async function ensurePersonalWorkspace(userId: string) {
-  const supabase = await createServerSupabaseClient();
-  const { data: existing, error: existingError } = await supabase
-    .from("workspace_members")
-    .select("workspace_id, workspaces(id, name)")
-    .eq("user_id", userId)
-    .eq("role", "owner")
-    .limit(1)
-    .maybeSingle();
+export async function requireSession() {
+  return requireLocalContext();
+}
 
-  if (existingError) {
-    throw existingError;
-  }
-
-  if (existing?.workspace_id) {
-    return {
-      id: existing.workspace_id,
-      name: "Personal workspace"
-    };
-  }
-
-  const { data: workspace, error: workspaceError } = await supabase
-    .from("workspaces")
-    .insert({ name: "Personal workspace", owner_user_id: userId })
-    .select("id, name")
-    .single();
-
-  if (workspaceError) {
-    throw workspaceError;
-  }
-
-  const { error: memberError } = await supabase.from("workspace_members").insert({
-    workspace_id: workspace.id,
-    user_id: userId,
-    role: "owner"
-  });
-
-  if (memberError) {
-    throw memberError;
-  }
-
-  return workspace;
+export function throwSqlitePersistencePending(): never {
+  throw new Error("SQLite persistence is not implemented in this migration slice yet.");
 }

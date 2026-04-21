@@ -1,21 +1,9 @@
 import { createWorkItem, updateWorkItemStatus } from "@/server/actions/work-items";
-import { requireSession } from "@/server/auth/session";
 import type { RepositoryRow, WorkItemRow } from "@/server/types";
 
 export default async function WorkItemsPage() {
-  const { supabase, workspace } = await requireSession();
-  const [{ data: items, error: itemsError }, { data: repositories, error: repositoriesError }] = await Promise.all([
-    supabase
-      .from("work_items")
-      .select("*, repositories(name)")
-      .eq("workspace_id", workspace.id)
-      .is("deleted_at", null)
-      .order("updated_at", { ascending: false }),
-    supabase.from("repositories").select("*").eq("workspace_id", workspace.id).is("deleted_at", null)
-  ]);
-
-  if (itemsError) throw itemsError;
-  if (repositoriesError) throw repositoriesError;
+  const items: WorkItemRow[] = [];
+  const repositories: RepositoryRow[] = [];
 
   return (
     <main className="page">
@@ -28,7 +16,7 @@ export default async function WorkItemsPage() {
         <section className="panel">
           <h2>一覧</h2>
           <div className="card-list">
-            {((items ?? []) as WorkItemRow[]).map((item) => (
+            {items.map((item) => (
               <article className="item-card" key={item.id}>
                 <h3>{item.title}</h3>
                 <div className="meta-row">
@@ -56,7 +44,7 @@ export default async function WorkItemsPage() {
               <label htmlFor="repositoryId">Repository<span className="required">※任意</span></label>
               <select id="repositoryId" name="repositoryId" defaultValue="">
                 <option value="">未紐づけ</option>
-                {((repositories ?? []) as RepositoryRow[]).map((repository) => (
+                {repositories.map((repository) => (
                   <option value={repository.id} key={repository.id}>{repository.name}</option>
                 ))}
               </select>

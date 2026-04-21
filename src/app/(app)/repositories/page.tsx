@@ -1,22 +1,9 @@
 import { createRepository } from "@/server/actions/repositories";
-import { requireSession } from "@/server/auth/session";
 import type { RepositoryRow } from "@/server/types";
 import Link from "next/link";
 
 export default async function RepositoriesPage() {
-  const { supabase, workspace } = await requireSession();
-  const { data, error } = await supabase
-    .from("repositories")
-    .select("*")
-    .eq("workspace_id", workspace.id)
-    .is("deleted_at", null)
-    .order("updated_at", { ascending: false });
-
-  if (error) {
-    throw error;
-  }
-
-  const repositories = (data ?? []) as RepositoryRow[];
+  const repositories: RepositoryRow[] = [];
 
   return (
     <main className="page">
@@ -29,7 +16,7 @@ export default async function RepositoriesPage() {
         <section className="panel" aria-labelledby="repository-list-heading">
           <h2 id="repository-list-heading">一覧</h2>
           {repositories.length === 0 ? (
-            <p className="support">まだリポジトリがありません。まずリポジトリを追加してください。</p>
+            <p className="support">SQLite query layer の接続後にリポジトリ一覧を表示します。</p>
           ) : (
             <div className="card-list">
               {repositories.map((repository) => (

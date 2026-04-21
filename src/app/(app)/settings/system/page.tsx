@@ -1,8 +1,8 @@
 export default function SystemSettingsPage() {
-  const runtimeMode = process.env.NEXTPATCH_RUNTIME_MODE ?? "development";
-  const hasSupabaseUrl = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL);
-  const hasAnonKey = Boolean(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
-  const hasServiceRole = Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY);
+  const runtimeMode = process.env.NEXTPATCH_RUNTIME_MODE ?? "local-server";
+  const dataDir = process.env.NEXTPATCH_DATA_DIR ?? "./data";
+  const dbPath = process.env.NEXTPATCH_DB_PATH ?? "./data/nextpatch.sqlite";
+  const exportDir = process.env.NEXTPATCH_EXPORT_DIR ?? "./data/exports";
 
   return (
     <main className="page">
@@ -15,12 +15,14 @@ export default function SystemSettingsPage() {
         <dl>
           <dt>Runtime</dt>
           <dd>{runtimeMode}</dd>
-          <dt>Supabase URL</dt>
-          <dd>{hasSupabaseUrl ? "設定済み" : "未設定"}</dd>
-          <dt>Supabase anon key</dt>
-          <dd>{hasAnonKey ? "設定済み" : "未設定"}</dd>
-          <dt>Service role key</dt>
-          <dd>{hasServiceRole ? "設定済み" : "未設定"}</dd>
+          <dt>Data directory</dt>
+          <dd>{dataDir}</dd>
+          <dt>SQLite database</dt>
+          <dd>{dbPath}</dd>
+          <dt>Export directory</dt>
+          <dd>{exportDir}</dd>
+          <dt>SQLite WAL files</dt>
+          <dd>DB path と同じディレクトリに生成されます。</dd>
         </dl>
       </section>
     </main>

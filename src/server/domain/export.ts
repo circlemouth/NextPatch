@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import { requireSession } from "@/server/auth/session";
+import { requireLocalContext } from "@/server/auth/session";
 
 export type BackupDocument = {
   format: "nextpatch.backup";
@@ -21,35 +21,27 @@ export type BackupDocument = {
   };
 };
 
-const entityTables = [
-  ["workspaces", "workspaces"],
-  ["workspaceMembers", "workspace_members"],
-  ["repositories", "repositories"],
-  ["workItems", "work_items"],
-  ["bugDetails", "bug_details"],
-  ["ideas", "ideas"],
-  ["techNotes", "tech_notes"],
-  ["referenceServices", "reference_services"],
-  ["tags", "tags"],
-  ["workItemTags", "work_item_tags"],
-  ["statusHistories", "status_histories"],
-  ["repositoryVersions", "repository_versions"],
-  ["classificationCandidates", "classification_candidates"]
+const entityNames = [
+  "workspaces",
+  "workspaceMembers",
+  "repositories",
+  "workItems",
+  "bugDetails",
+  "ideas",
+  "techNotes",
+  "referenceServices",
+  "tags",
+  "workItemTags",
+  "statusHistories",
+  "repositoryVersions",
+  "classificationCandidates"
 ] as const;
 
 export async function createBackupDocument(): Promise<BackupDocument> {
-  const { supabase, workspace } = await requireSession();
-  const entities: Record<string, unknown[]> = {};
-
-  for (const [entityName, tableName] of entityTables) {
-    const query = supabase.from(tableName).select("*");
-    const { data, error } =
-      tableName === "workspaces" ? await query.eq("id", workspace.id) : await query.eq("workspace_id", workspace.id);
-    if (error) {
-      throw error;
-    }
-    entities[entityName] = data ?? [];
-  }
+  const { user, workspace } = await requireLocalContext();
+  const entities: Record<string, unknown[]> = Object.fromEntries(entityNames.map((entityName) => [entityName, []]));
+  entities.workspaces = [{ id: workspace.id, name: workspace.name }];
+  entities.workspaceMembers = [{ workspace_id: workspace.id, user_id: user.id, role: "owner" }];
 
   const counts = Object.fromEntries(Object.entries(entities).map(([key, value]) => [key, value.length]));
   const hashPayload = JSON.stringify({ entities, counts });

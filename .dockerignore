@@ -5,6 +5,13 @@ coverage
 playwright-report
 test-results
 exports
-supabase/.temp
+data
+backups
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+*.db
+*.db-wal
+*.db-shm
 .env
 .env.local

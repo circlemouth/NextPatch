@@ -1,17 +1,8 @@
 import { quickCapture } from "@/server/actions/capture";
-import { requireSession } from "@/server/auth/session";
 import type { RepositoryRow } from "@/server/types";
 
 export default async function CapturePage() {
-  const { supabase, workspace } = await requireSession();
-  const { data, error } = await supabase
-    .from("repositories")
-    .select("*")
-    .eq("workspace_id", workspace.id)
-    .is("deleted_at", null)
-    .order("updated_at", { ascending: false });
-
-  if (error) throw error;
+  const repositories: RepositoryRow[] = [];
 
   return (
     <main className="page">
@@ -31,7 +22,7 @@ export default async function CapturePage() {
             <label htmlFor="repositoryId">Repository<span className="required">※任意</span></label>
             <select id="repositoryId" name="repositoryId" defaultValue="">
               <option value="">未確定</option>
-              {((data ?? []) as RepositoryRow[]).map((repository) => (
+              {repositories.map((repository) => (
                 <option value={repository.id} key={repository.id}>{repository.name}</option>
               ))}
             </select>
