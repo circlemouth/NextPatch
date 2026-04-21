@@ -1,19 +1,13 @@
 import fs from "node:fs";
 import path from "node:path";
-import Database from "better-sqlite3";
+import { openSqliteDatabase } from "./client";
 import { getDatabasePath } from "./paths";
 
 const migrationDir = path.resolve("drizzle");
 
-function migrate() {
-  const dbPath = getDatabasePath();
+export function migrateDatabase(dbPath = getDatabasePath()) {
   fs.mkdirSync(path.dirname(dbPath), { recursive: true });
-
-  const sqlite = new Database(dbPath);
-  sqlite.pragma("foreign_keys = ON");
-  sqlite.pragma("journal_mode = WAL");
-  sqlite.pragma("busy_timeout = 5000");
-
+  const sqlite = openSqliteDatabase(dbPath);
   const files = fs
     .readdirSync(migrationDir)
     .filter((file) => file.endsWith(".sql"))
@@ -25,7 +19,10 @@ function migrate() {
   }
 
   sqlite.close();
-  console.log(`Migrated SQLite database at ${dbPath}`);
 }
 
-migrate();
+if (import.meta.url === `file://${process.argv[1]}`) {
+  const dbPath = getDatabasePath();
+  migrateDatabase(dbPath);
+  console.log(`Migrated SQLite database at ${dbPath}`);
+}
