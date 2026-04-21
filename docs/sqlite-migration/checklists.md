@@ -47,7 +47,8 @@ grep -R "postgres\|nextpatch-db" docker-compose.yml .env.example || true
 - [ ] `pnpm typecheck`
 - [ ] `pnpm test`
 - [ ] `pnpm build`
-- [ ] 必要なら `pnpm test:e2e`
+- [ ] `pnpm test:e2e --list`
+- [ ] `pnpm test:e2e`
 - [ ] `pnpm db:migrate`
 - [ ] `pnpm db:seed`
 - [ ] `docker compose config`
@@ -142,10 +143,12 @@ grep -R "postgres\|nextpatch-db" docker-compose.yml .env.example || true
 
 ## 8. 最終成果物 zip checklist
 
-- [ ] zip に `nextpatch-sqlite-migration-docs/**` が含まれる。
+- [ ] zip に `docs/sqlite-migration/**` が含まれる。
 - [ ] zip に `src/**` が含まれる。
+- [ ] zip に `tests/e2e/**` が含まれる。
 - [ ] zip に `drizzle/**` が含まれる。
-- [ ] zip に `package.json`, `pnpm-lock.yaml`, `.env.example`, `docker-compose.yml` が含まれる。
+- [ ] zip に `public/.gitkeep` または必要な public assets が含まれる。public assets が不要な場合は Dockerfile が `public/` を copy しない。
+- [ ] zip に `package.json`, `pnpm-lock.yaml`, `.env.example`, `Dockerfile`, `docker-compose.yml` が含まれる。
 - [ ] zip に `.git/` が含まれない。
 - [ ] zip に `node_modules/` が含まれない。
 - [ ] zip に `.next/` が含まれない。
@@ -153,3 +156,11 @@ grep -R "postgres\|nextpatch-db" docker-compose.yml .env.example || true
 - [ ] zip に SQLite DB / WAL / SHM files が含まれない。
 - [ ] zip に `.env` が含まれない。
 - [ ] zip に `supabase/` が含まれない。
+
+### zip 検証コマンド
+
+```bash
+unzip -t nextpatch-sqlite-migration-implementation-static-fixed.zip
+unzip -l nextpatch-sqlite-migration-implementation-static-fixed.zip | grep -E "tests/e2e|public/|Dockerfile|package.json|README.md"
+unzip -l nextpatch-sqlite-migration-implementation-static-fixed.zip | grep -E "supabase/|node_modules/|\\.git/|\\.next/|data/|exports/|backups/|\\.sqlite|\\.sqlite-wal|\\.sqlite-shm" && echo "Unexpected excluded artifact found" || true
+```

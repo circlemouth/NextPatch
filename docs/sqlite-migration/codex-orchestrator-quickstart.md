@@ -65,11 +65,10 @@ pnpm lint
 pnpm typecheck
 pnpm test
 pnpm build
+pnpm test:e2e --list
+pnpm test:e2e
 pnpm db:migrate
 pnpm db:seed
-
-# 必要なら
-pnpm test:e2e
 
 grep -R "supabase\|Supabase\|SUPABASE\|magic link\|signInWithOtp\|auth.users\|row level security\|nextpatch-db\|postgres" . --exclude-dir=node_modules --exclude-dir=.git || true
 
@@ -82,7 +81,7 @@ docker compose down
 ## 7. 最終 zip 作成例
 
 ```bash
-zip -r nextpatch-sqlite-migration-implementation.zip . \
+zip -r nextpatch-sqlite-migration-implementation-static-fixed.zip . \
   -x ".git/*" \
   -x "node_modules/*" \
   -x ".next/*" \
@@ -92,6 +91,7 @@ zip -r nextpatch-sqlite-migration-implementation.zip . \
   -x "coverage/*" \
   -x "test-results/*" \
   -x "playwright-report/*" \
+  -x "supabase/*" \
   -x "*.sqlite" \
   -x "*.sqlite-wal" \
   -x "*.sqlite-shm" \
@@ -100,6 +100,10 @@ zip -r nextpatch-sqlite-migration-implementation.zip . \
   -x "*.db-shm" \
   -x ".env" \
   -x ".env.local"
+
+unzip -t nextpatch-sqlite-migration-implementation-static-fixed.zip
+unzip -l nextpatch-sqlite-migration-implementation-static-fixed.zip | grep -E "tests/e2e|public/|Dockerfile|package.json|README.md"
+unzip -l nextpatch-sqlite-migration-implementation-static-fixed.zip | grep -E "supabase/|node_modules/|\\.git/|\\.next/|data/|exports/|backups/|\\.sqlite|\\.sqlite-wal|\\.sqlite-shm" && echo "Unexpected excluded artifact found" || true
 ```
 
 ## 8. 完了報告テンプレート
