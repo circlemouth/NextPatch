@@ -1,14 +1,14 @@
 "use server";
 
-import { requireSession } from "@/server/auth/session";
-import { applyStatusTimestamps } from "@/server/domain/status";
+import { requireLocalContext } from "@/server/auth/session";
+import { createWorkItemCommand, updateWorkItemStatusCommand } from "@/server/db/queries/work-items";
 import { defaultStatus } from "@/server/domain/work-item-defaults";
 import { workItemSchema } from "@/server/validation/schemas";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 export async function createWorkItem(formData: FormData) {
-  const { supabase, user, workspace } = await requireSession();
+  const { user, workspace } = await requireLocalContext();
   const parsed = workItemSchema.parse({
     repositoryId: formData.get("repositoryId") || "",
     type: formData.get("type"),
@@ -22,68 +22,32 @@ export async function createWorkItem(formData: FormData) {
   const repositoryId = parsed.repositoryId || null;
   const scope = repositoryId ? "repository" : parsed.type === "memo" ? "inbox" : "global";
 
-  const { data, error } = await supabase
-    .from("work_items")
-    .insert({
-      workspace_id: workspace.id,
-      user_id: user.id,
-      repository_id: repositoryId,
-      scope,
-      type: parsed.type,
-      title: parsed.title,
-      body: parsed.body || null,
-      status: defaultStatus(parsed.type),
-      priority: parsed.priority,
-      source_type: "manual",
-      privacy_level: parsed.privacyLevel,
-      is_pinned: parsed.isPinned,
-      external_url: parsed.externalUrl || null,
-      external_provider: parsed.externalUrl?.includes("github.com") ? "github" : null
-    })
-    .select("id")
-    .single();
-
-  if (error) {
-    throw error;
-  }
+  const id = await createWorkItemCommand({
+    workspaceId: workspace.id,
+    userId: user.id,
+    repositoryId,
+    scope,
+    type: parsed.type,
+    title: parsed.title,
+    body: parsed.body || null,
+    status: defaultStatus(parsed.type),
+    priority: parsed.priority,
+    sourceType: "manual",
+    privacyLevel: parsed.privacyLevel,
+    isPinned: parsed.isPinned,
+    externalUrl: parsed.externalUrl || null,
+    externalProvider: parsed.externalUrl?.includes("github.com") ? "github" : null
+  });
 
   revalidatePath("/work-items");
-  redirect(`/work-items/${data.id}`);
+  redirect(`/work-items/${id}`);
 }
 
 export async function updateWorkItemStatus(formData: FormData) {
-  const { supabase, user, workspace } = await requireSession();
+  const { user, workspace } = await requireLocalContext();
   const id = String(formData.get("id") ?? "");
   const status = String(formData.get("status") ?? "");
-  const { data: item, error: itemError } = await supabase
-    .from("work_items")
-    .select("*")
-    .eq("workspace_id", workspace.id)
-    .eq("id", id)
-    .single();
-
-  if (itemError) {
-    throw itemError;
-  }
-
-  const timestamps = applyStatusTimestamps(item, status);
-  const { error } = await supabase
-    .from("work_items")
-    .update({ status, ...timestamps })
-    .eq("workspace_id", workspace.id)
-    .eq("id", id);
-
-  if (error) {
-    throw error;
-  }
-
-  await supabase.from("status_histories").insert({
-    workspace_id: workspace.id,
-    user_id: user.id,
-    work_item_id: id,
-    from_status: item.status,
-    to_status: status
-  });
+  await updateWorkItemStatusCommand(workspace.id, user.id, id, status);
 
   revalidatePath("/dashboard");
   revalidatePath("/work-items");

@@ -1,13 +1,14 @@
 "use server";
 
-import { requireSession } from "@/server/auth/session";
+import { requireLocalContext } from "@/server/auth/session";
+import { quickCaptureCommand } from "@/server/db/queries/classification";
 import { parseImportContent } from "@/server/domain/import-parser";
 import { quickCaptureSchema } from "@/server/validation/schemas";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 export async function quickCapture(formData: FormData) {
-  const { supabase, user, workspace } = await requireSession();
+  const { user, workspace } = await requireLocalContext();
   const parsed = quickCaptureSchema.parse({
     repositoryId: formData.get("repositoryId") || "",
     type: formData.get("type") || "auto",
@@ -23,44 +24,19 @@ export async function quickCapture(formData: FormData) {
   const title = parsed.title || firstLine(parsed.body);
   const importResult = parseImportContent(parsed.body);
 
-  const { data: memo, error } = await supabase
-    .from("work_items")
-    .insert({
-      workspace_id: workspace.id,
-      user_id: user.id,
-      repository_id: repositoryId,
-      scope,
-      type,
-      title,
-      body: parsed.body,
-      status: type === "memo" ? "unreviewed" : "todo",
-      priority: "p2",
-      source_type: parsed.sourceType === "chatgpt" ? "chatgpt" : "manual",
-      privacy_level: parsed.privacyLevel,
-      is_pinned: parsed.isPinned
-    })
-    .select("id")
-    .single();
-
-  if (error) {
-    throw error;
-  }
-
-  if (importResult.candidates.length > 0) {
-    await supabase.from("classification_candidates").insert(
-      importResult.candidates.map((candidate) => ({
-        workspace_id: workspace.id,
-        user_id: user.id,
-        memo_work_item_id: memo.id,
-        target_type: candidate.targetType,
-        title: candidate.title,
-        body: candidate.body,
-        confidence: candidate.confidence,
-        parse_source: importResult.format,
-        parse_error: importResult.error ?? null
-      }))
-    );
-  }
+  await quickCaptureCommand({
+    workspaceId: workspace.id,
+    userId: user.id,
+    repositoryId,
+    scope,
+    type,
+    title,
+    body: parsed.body,
+    sourceType: parsed.sourceType === "chatgpt" ? "chatgpt" : "manual",
+    privacyLevel: parsed.privacyLevel,
+    isPinned: parsed.isPinned,
+    importResult
+  });
 
   revalidatePath("/dashboard");
   revalidatePath("/inbox");

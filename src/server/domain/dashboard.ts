@@ -1,4 +1,5 @@
-import { requireSession } from "@/server/auth/session";
+import { requireLocalContext } from "@/server/auth/session";
+import { listDashboardWorkItems } from "@/server/db/queries/dashboard";
 import { isClosed, isOnHold } from "@/server/domain/status";
 import type { WorkItemRow } from "@/server/types";
 
@@ -14,24 +15,13 @@ export type DashboardItem = {
 };
 
 export async function getDashboard() {
-  const { supabase, workspace } = await requireSession();
-  const { data, error } = await supabase
-    .from("work_items")
-    .select("*, repositories(name, production_status)")
-    .eq("workspace_id", workspace.id)
-    .is("deleted_at", null)
-    .order("updated_at", { ascending: false })
-    .limit(100);
-
-  if (error) {
-    throw error;
-  }
-
-  const items = ((data ?? []) as WorkItemRow[]).map(toDashboardItem).filter((item) => item.tier < 99);
+  const { workspace } = await requireLocalContext();
+  const rows = await listDashboardWorkItems(workspace.id);
+  const items = rows.map(toDashboardItem).filter((item) => item.tier < 99);
   const now = [...items].sort((a: DashboardItem, b: DashboardItem) => a.tier - b.tier).slice(0, 10);
   const criticalBugs = items.filter((item) => item.reasons.includes("実稼働重大バグ")).slice(0, 5);
   const inbox = items.filter((item) => item.type === "memo" && item.status === "unreviewed").slice(0, 5);
-  const recentCompleted = ((data ?? []) as WorkItemRow[])
+  const recentCompleted = rows
     .filter((item) => item.completed_at && isRecent(item.completed_at))
     .slice(0, 10)
     .map(toDashboardItem);

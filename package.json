@@ -7,6 +7,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "db:migrate": "tsx src/server/db/migrate.ts",
+    "db:seed": "tsx src/server/db/seed.ts",
+    "db:generate": "drizzle-kit generate",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
@@ -14,8 +17,8 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
-    "@supabase/ssr": "^0.10.2",
-    "@supabase/supabase-js": "^2.86.0",
+    "better-sqlite3": "^12.9.0",
+    "drizzle-orm": "^0.45.2",
     "next": "16.2.4",
     "react": "19.2.5",
     "react-dom": "19.2.5",
@@ -26,14 +29,22 @@
     "@playwright/test": "^1.57.0",
     "@testing-library/jest-dom": "^6.9.0",
     "@testing-library/react": "^16.3.0",
+    "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^22.16.0",
     "@types/react": "^19.1.0",
     "@types/react-dom": "^19.1.0",
     "@vitejs/plugin-react": "^5.1.0",
+    "drizzle-kit": "^0.31.10",
     "eslint": "^9.39.0",
     "eslint-config-next": "16.2.4",
     "jsdom": "^27.3.0",
+    "tsx": "^4.21.0",
     "typescript": "^5.9.0",
     "vitest": "^4.1.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "better-sqlite3"
+    ]
   }
 }

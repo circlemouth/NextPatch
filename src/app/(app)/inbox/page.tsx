@@ -1,25 +1,11 @@
 import { classifyMemo } from "@/server/actions/classification";
-import { requireSession } from "@/server/auth/session";
-import type { RepositoryRow, WorkItemRow } from "@/server/types";
+import { requireLocalContext } from "@/server/auth/session";
+import { listRepositories } from "@/server/db/queries/repositories";
+import { listMemoWorkItems } from "@/server/db/queries/work-items";
 
 export default async function InboxPage() {
-  const { supabase, workspace } = await requireSession();
-  const [{ data: memos, error: memosError }, { data: repositories, error: repositoriesError }] = await Promise.all([
-    supabase
-      .from("work_items")
-      .select("*")
-      .eq("workspace_id", workspace.id)
-      .eq("type", "memo")
-      .is("deleted_at", null)
-      .order("updated_at", { ascending: false }),
-    supabase.from("repositories").select("*").eq("workspace_id", workspace.id).is("deleted_at", null)
-  ]);
-
-  if (memosError) throw memosError;
-  if (repositoriesError) throw repositoriesError;
-
-  const memoItems = (memos ?? []) as WorkItemRow[];
-  const repoOptions = (repositories ?? []) as RepositoryRow[];
+  const { workspace } = await requireLocalContext();
+  const [memoItems, repoOptions] = await Promise.all([listMemoWorkItems(workspace.id), listRepositories(workspace.id)]);
 
   return (
     <main className="page">

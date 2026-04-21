@@ -1,5 +1,5 @@
 import { logout } from "@/server/actions/auth";
-import { requireSession } from "@/server/auth/session";
+import { requireLocalContext } from "@/server/auth/session";
 import Link from "next/link";
 
 const navItems = [
@@ -19,7 +19,7 @@ export default async function AppLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const { user } = await requireSession();
+  const { user } = await requireLocalContext();
 
   return (
     <div className="app-shell">
