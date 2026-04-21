@@ -1,11 +1,11 @@
 import { createRepository } from "@/server/actions/repositories";
-import { requireSession } from "@/server/auth/session";
-import { listRepositories } from "@/server/db/queries/context";
+import { requireLocalContext } from "@/server/auth/session";
+import { listRepositories } from "@/server/db/queries/repositories";
 import Link from "next/link";
 
 export default async function RepositoriesPage() {
-  const { workspace } = await requireSession();
-  const repositories = listRepositories(workspace.id);
+  const { workspace } = await requireLocalContext();
+  const repositories = await listRepositories(workspace.id);
 
   return (
     <main className="page">

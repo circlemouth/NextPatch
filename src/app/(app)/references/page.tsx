@@ -1,9 +1,9 @@
-import { requireSession } from "@/server/auth/session";
-import { listReferenceServices } from "@/server/db/queries/context";
+import { requireLocalContext } from "@/server/auth/session";
+import { listReferenceServices } from "@/server/db/queries/misc";
 
 export default async function ReferencesPage() {
-  const { workspace } = await requireSession();
-  const references = listReferenceServices(workspace.id);
+  const { workspace } = await requireLocalContext();
+  const data = await listReferenceServices(workspace.id);
 
   return (
     <main className="page">
@@ -12,7 +12,7 @@ export default async function ReferencesPage() {
         <h1>参考サービス</h1>
       </header>
       <section className="panel">
-        {references.length === 0 ? <p className="support">参考サービスはまだありません。</p> : null}
+        {data.length === 0 ? <p className="support">参考サービスはまだありません。</p> : null}
       </section>
     </main>
   );

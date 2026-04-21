@@ -1,5 +1,5 @@
-import { requireSession } from "@/server/auth/session";
-import { listWorkItems } from "@/server/db/queries/context";
+import { requireLocalContext } from "@/server/auth/session";
+import { listDashboardWorkItems } from "@/server/db/queries/dashboard";
 import { isClosed, isOnHold } from "@/server/domain/status";
 import type { WorkItemRow } from "@/server/types";
 
@@ -15,13 +15,13 @@ export type DashboardItem = {
 };
 
 export async function getDashboard() {
-  const { workspace } = await requireSession();
-  const data = listWorkItems({ workspaceId: workspace.id, includeRepository: true }).slice(0, 100);
-  const items = data.map(toDashboardItem).filter((item) => item.tier < 99);
+  const { workspace } = await requireLocalContext();
+  const rows = await listDashboardWorkItems(workspace.id);
+  const items = rows.map(toDashboardItem).filter((item) => item.tier < 99);
   const now = [...items].sort((a: DashboardItem, b: DashboardItem) => a.tier - b.tier).slice(0, 10);
   const criticalBugs = items.filter((item) => item.reasons.includes("実稼働重大バグ")).slice(0, 5);
   const inbox = items.filter((item) => item.type === "memo" && item.status === "unreviewed").slice(0, 5);
-  const recentCompleted = data
+  const recentCompleted = rows
     .filter((item) => item.completed_at && isRecent(item.completed_at))
     .slice(0, 10)
     .map(toDashboardItem);

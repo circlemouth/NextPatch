@@ -1,6 +1,6 @@
 import crypto from "node:crypto";
-import { requireSession } from "@/server/auth/session";
-import { getWorkspaceExportEntities } from "@/server/db/queries/context";
+import { requireLocalContext } from "@/server/auth/session";
+import { readBackupEntities } from "@/server/db/queries/export";
 
 export type BackupDocument = {
   format: "nextpatch.backup";
@@ -23,8 +23,8 @@ export type BackupDocument = {
 };
 
 export async function createBackupDocument(): Promise<BackupDocument> {
-  const { workspace } = await requireSession();
-  const entities = getWorkspaceExportEntities(workspace.id);
+  const { workspace } = await requireLocalContext();
+  const entities = await readBackupEntities(workspace.id);
 
   const counts = Object.fromEntries(Object.entries(entities).map(([key, value]) => [key, value.length]));
   const hashPayload = JSON.stringify({ entities, counts });

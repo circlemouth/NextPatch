@@ -5,8 +5,6 @@ export default defineConfig({
   out: "./drizzle",
   dialect: "sqlite",
   dbCredentials: {
-    url: process.env.NEXTPATCH_DB_PATH ?? "./.data/nextpatch.sqlite"
-  },
-  strict: true,
-  verbose: true
+    url: process.env.NEXTPATCH_DB_PATH ?? "./data/nextpatch.sqlite"
+  }
 });

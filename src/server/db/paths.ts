@@ -1,12 +1,19 @@
-import fs from "node:fs";
 import path from "node:path";
 
-const defaultRelativePath = ".data/nextpatch.sqlite";
+const DEFAULT_DATA_DIR = "./data";
+const DEFAULT_DB_FILE = "nextpatch.sqlite";
+const DEFAULT_EXPORT_DIR = "exports";
 
-export function getDatabasePath() {
-  return path.resolve(process.cwd(), process.env.NEXTPATCH_DB_PATH ?? defaultRelativePath);
+export function getDataDir() {
+  return path.resolve(process.env.NEXTPATCH_DATA_DIR ?? DEFAULT_DATA_DIR);
 }
 
-export function ensureDatabaseDirectory(databasePath = getDatabasePath()) {
-  fs.mkdirSync(path.dirname(databasePath), { recursive: true });
+export function getDatabasePath() {
+  const explicitPath = process.env.NEXTPATCH_DB_PATH;
+  return path.resolve(explicitPath ?? path.join(getDataDir(), DEFAULT_DB_FILE));
+}
+
+export function getExportDir() {
+  const explicitPath = process.env.NEXTPATCH_EXPORT_DIR;
+  return path.resolve(explicitPath ?? path.join(getDataDir(), DEFAULT_EXPORT_DIR));
 }

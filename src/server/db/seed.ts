@@ -1,6 +1,47 @@
-import { getDb } from "@/server/db/client";
-import { ensureLocalContext } from "@/server/db/queries/context";
+import { getDb, getSqlite } from "./client";
+import { LOCAL_USER_ID, PERSONAL_WORKSPACE_ID } from "../auth/session";
+import { localUsers, workspaceMembers, workspaces } from "./schema";
 
-const context = ensureLocalContext(getDb());
+function seed() {
+  const db = getDb();
+  const now = new Date().toISOString();
 
-console.log(`Seeded ${context.user.id} in ${context.workspace.id}.`);
+  db.transaction((tx) => {
+    tx.insert(localUsers)
+      .values({
+        id: LOCAL_USER_ID,
+        displayName: "Local user",
+        createdAt: now,
+        updatedAt: now
+      })
+      .onConflictDoNothing()
+      .run();
+
+    tx.insert(workspaces)
+      .values({
+        id: PERSONAL_WORKSPACE_ID,
+        ownerUserId: LOCAL_USER_ID,
+        name: "Personal workspace",
+        createdAt: now,
+        updatedAt: now
+      })
+      .onConflictDoNothing()
+      .run();
+
+    tx.insert(workspaceMembers)
+      .values({
+        id: crypto.randomUUID(),
+        workspaceId: PERSONAL_WORKSPACE_ID,
+        userId: LOCAL_USER_ID,
+        role: "owner",
+        createdAt: now
+      })
+      .onConflictDoNothing()
+      .run();
+  });
+
+  getSqlite().close();
+  console.log(`Seeded ${LOCAL_USER_ID} and ${PERSONAL_WORKSPACE_ID}`);
+}
+
+seed();

@@ -1,11 +1,11 @@
 import { createWorkItem, updateWorkItemStatus } from "@/server/actions/work-items";
-import { requireSession } from "@/server/auth/session";
-import { listRepositories, listWorkItems } from "@/server/db/queries/context";
+import { requireLocalContext } from "@/server/auth/session";
+import { listRepositories } from "@/server/db/queries/repositories";
+import { listWorkItems } from "@/server/db/queries/work-items";
 
 export default async function WorkItemsPage() {
-  const { workspace } = await requireSession();
-  const items = listWorkItems({ workspaceId: workspace.id, includeRepository: true });
-  const repositories = listRepositories(workspace.id);
+  const { workspace } = await requireLocalContext();
+  const [items, repositories] = await Promise.all([listWorkItems(workspace.id), listRepositories(workspace.id)]);
 
   return (
     <main className="page">

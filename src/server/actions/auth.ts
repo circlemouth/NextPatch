@@ -2,10 +2,11 @@
 
 import { redirect } from "next/navigation";
 
-export async function enterLocalApp() {
+export async function signInWithEmail(formData: FormData) {
+  void formData;
   redirect("/dashboard");
 }
 
 export async function logout() {
-  redirect("/login");
+  redirect("/dashboard");
 }

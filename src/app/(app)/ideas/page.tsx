@@ -1,9 +1,9 @@
-import { requireSession } from "@/server/auth/session";
-import { listWorkItems } from "@/server/db/queries/context";
+import { requireLocalContext } from "@/server/auth/session";
+import { listWorkItemsByTypes } from "@/server/db/queries/work-items";
 
 export default async function IdeasPage() {
-  const { workspace } = await requireSession();
-  const items = listWorkItems({ workspaceId: workspace.id, types: ["idea", "future_feature", "implementation"] });
+  const { workspace } = await requireLocalContext();
+  const items = await listWorkItemsByTypes(workspace.id, ["idea", "future_feature", "implementation"]);
 
   return (
     <main className="page">

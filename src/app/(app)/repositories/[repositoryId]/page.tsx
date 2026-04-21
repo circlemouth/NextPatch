@@ -1,6 +1,8 @@
 import { createWorkItem, updateWorkItemStatus } from "@/server/actions/work-items";
-import { requireSession } from "@/server/auth/session";
-import { getRepository, listWorkItems } from "@/server/db/queries/context";
+import { requireLocalContext } from "@/server/auth/session";
+import { getRepositoryById } from "@/server/db/queries/repositories";
+import { listWorkItemsForRepository } from "@/server/db/queries/work-items";
+import { notFound } from "next/navigation";
 
 type RepositoryDetailPageProps = {
   params: Promise<{ repositoryId: string }>;
@@ -8,9 +10,15 @@ type RepositoryDetailPageProps = {
 
 export default async function RepositoryDetailPage({ params }: RepositoryDetailPageProps) {
   const { repositoryId } = await params;
-  const { workspace } = await requireSession();
-  const repo = getRepository(workspace.id, repositoryId);
-  const workItems = listWorkItems({ workspaceId: workspace.id, repositoryId });
+  const { workspace } = await requireLocalContext();
+  const [repo, workItems] = await Promise.all([
+    getRepositoryById(workspace.id, repositoryId),
+    listWorkItemsForRepository(workspace.id, repositoryId)
+  ]);
+
+  if (!repo) {
+    notFound();
+  }
 
   return (
     <main className="page">

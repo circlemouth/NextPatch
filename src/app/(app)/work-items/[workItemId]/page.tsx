@@ -1,5 +1,6 @@
-import { requireSession } from "@/server/auth/session";
-import { getWorkItem } from "@/server/db/queries/context";
+import { requireLocalContext } from "@/server/auth/session";
+import { getWorkItemById } from "@/server/db/queries/work-items";
+import { notFound } from "next/navigation";
 
 type WorkItemDetailPageProps = {
   params: Promise<{ workItemId: string }>;
@@ -7,8 +8,12 @@ type WorkItemDetailPageProps = {
 
 export default async function WorkItemDetailPage({ params }: WorkItemDetailPageProps) {
   const { workItemId } = await params;
-  const { workspace } = await requireSession();
-  const item = getWorkItem(workspace.id, workItemId);
+  const { workspace } = await requireLocalContext();
+  const item = await getWorkItemById(workspace.id, workItemId);
+
+  if (!item) {
+    notFound();
+  }
 
   return (
     <main className="page">

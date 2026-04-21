@@ -1,9 +1,9 @@
-import { requireSession } from "@/server/auth/session";
-import { listTechNotes } from "@/server/db/queries/context";
+import { requireLocalContext } from "@/server/auth/session";
+import { listTechNotes } from "@/server/db/queries/misc";
 
 export default async function TechNotesPage() {
-  const { workspace } = await requireSession();
-  const techNoteRows = listTechNotes(workspace.id);
+  const { workspace } = await requireLocalContext();
+  const data = await listTechNotes(workspace.id);
 
   return (
     <main className="page">
@@ -12,7 +12,7 @@ export default async function TechNotesPage() {
         <h1>技術メモ</h1>
       </header>
       <section className="panel">
-        {techNoteRows.length === 0 ? <p className="support">技術メモはまだありません。</p> : null}
+        {data.length === 0 ? <p className="support">技術メモはまだありません。</p> : null}
       </section>
     </main>
   );

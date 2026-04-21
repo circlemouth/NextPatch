@@ -1,11 +1,11 @@
 import { classifyMemo } from "@/server/actions/classification";
-import { requireSession } from "@/server/auth/session";
-import { listRepositories, listWorkItems } from "@/server/db/queries/context";
+import { requireLocalContext } from "@/server/auth/session";
+import { listRepositories } from "@/server/db/queries/repositories";
+import { listMemoWorkItems } from "@/server/db/queries/work-items";
 
 export default async function InboxPage() {
-  const { workspace } = await requireSession();
-  const memoItems = listWorkItems({ workspaceId: workspace.id, types: ["memo"] });
-  const repoOptions = listRepositories(workspace.id);
+  const { workspace } = await requireLocalContext();
+  const [memoItems, repoOptions] = await Promise.all([listMemoWorkItems(workspace.id), listRepositories(workspace.id)]);
 
   return (
     <main className="page">

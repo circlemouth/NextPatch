@@ -1,20 +1,14 @@
 "use server";
 
-import { requireSession } from "@/server/auth/session";
-import {
-  createWorkItem as insertWorkItem,
-  getWorkItem,
-  insertStatusHistory,
-  updateWorkItemStatus as persistWorkItemStatus
-} from "@/server/db/queries/context";
-import { applyStatusTimestamps } from "@/server/domain/status";
+import { requireLocalContext } from "@/server/auth/session";
+import { createWorkItemCommand, updateWorkItemStatusCommand } from "@/server/db/queries/work-items";
 import { defaultStatus } from "@/server/domain/work-item-defaults";
 import { workItemSchema } from "@/server/validation/schemas";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 export async function createWorkItem(formData: FormData) {
-  const { user, workspace } = await requireSession();
+  const { user, workspace } = await requireLocalContext();
   const parsed = workItemSchema.parse({
     repositoryId: formData.get("repositoryId") || "",
     type: formData.get("type"),
@@ -28,42 +22,32 @@ export async function createWorkItem(formData: FormData) {
   const repositoryId = parsed.repositoryId || null;
   const scope = repositoryId ? "repository" : parsed.type === "memo" ? "inbox" : "global";
 
-  const item = insertWorkItem({
-    workspace_id: workspace.id,
-    user_id: user.id,
-    repository_id: repositoryId,
+  const id = await createWorkItemCommand({
+    workspaceId: workspace.id,
+    userId: user.id,
+    repositoryId,
     scope,
     type: parsed.type,
     title: parsed.title,
     body: parsed.body || null,
     status: defaultStatus(parsed.type),
     priority: parsed.priority,
-    source_type: "manual",
-    privacy_level: parsed.privacyLevel,
-    is_pinned: parsed.isPinned,
-    external_url: parsed.externalUrl || null,
-    external_provider: parsed.externalUrl?.includes("github.com") ? "github" : null
+    sourceType: "manual",
+    privacyLevel: parsed.privacyLevel,
+    isPinned: parsed.isPinned,
+    externalUrl: parsed.externalUrl || null,
+    externalProvider: parsed.externalUrl?.includes("github.com") ? "github" : null
   });
 
   revalidatePath("/work-items");
-  redirect(`/work-items/${item.id}`);
+  redirect(`/work-items/${id}`);
 }
 
 export async function updateWorkItemStatus(formData: FormData) {
-  const { user, workspace } = await requireSession();
+  const { user, workspace } = await requireLocalContext();
   const id = String(formData.get("id") ?? "");
   const status = String(formData.get("status") ?? "");
-  const item = getWorkItem(workspace.id, id);
-
-  const timestamps = applyStatusTimestamps(item, status);
-  persistWorkItemStatus(workspace.id, id, status, timestamps);
-  insertStatusHistory({
-    workspace_id: workspace.id,
-    user_id: user.id,
-    work_item_id: id,
-    from_status: item.status,
-    to_status: status
-  });
+  await updateWorkItemStatusCommand(workspace.id, user.id, id, status);
 
   revalidatePath("/dashboard");
   revalidatePath("/work-items");

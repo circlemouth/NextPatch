@@ -1,375 +1,248 @@
-import { sql } from "drizzle-orm";
-import { check, index, integer, sqliteTable, text, uniqueIndex, type AnySQLiteColumn } from "drizzle-orm/sqlite-core";
-
-const isoNow = sql<string>`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`;
-
-export const repositoryProviderValues = ["manual", "github"] as const;
-export const productionStatusValues = ["planning", "development", "active_production", "maintenance", "paused"] as const;
-export const criticalityValues = ["high", "medium", "low"] as const;
-export const workItemScopeValues = ["repository", "inbox", "global"] as const;
-export const workItemTypeValues = ["task", "bug", "idea", "implementation", "future_feature", "memo"] as const;
-export const priorityValues = ["p0", "p1", "p2", "p3", "p4"] as const;
-export const sourceTypeValues = ["manual", "chatgpt", "github", "web", "import", "system"] as const;
-export const privacyLevelValues = ["normal", "confidential", "secret", "no_ai"] as const;
-export const workspaceRoleValues = ["owner", "member"] as const;
-
-function enumCheck(column: AnySQLiteColumn, values: readonly string[]) {
-  return sql`${column} in (${sql.raw(values.map((value) => `'${value}'`).join(", "))})`;
-}
+import { index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 
 export const localUsers = sqliteTable("local_users", {
   id: text("id").primaryKey(),
-  email: text("email"),
-  display_name: text("display_name"),
-  created_at: text("created_at").notNull().default(isoNow),
-  updated_at: text("updated_at").notNull().default(isoNow)
+  displayName: text("display_name").notNull(),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull()
 });
 
 export const workspaces = sqliteTable("workspaces", {
   id: text("id").primaryKey(),
-  owner_user_id: text("owner_user_id")
-    .notNull()
-    .references(() => localUsers.id, { onDelete: "cascade" }),
+  ownerUserId: text("owner_user_id").notNull(),
   name: text("name").notNull(),
-  created_at: text("created_at").notNull().default(isoNow),
-  updated_at: text("updated_at").notNull().default(isoNow),
-  archived_at: text("archived_at"),
-  deleted_at: text("deleted_at")
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+  archivedAt: text("archived_at"),
+  deletedAt: text("deleted_at")
 });
 
 export const workspaceMembers = sqliteTable(
   "workspace_members",
   {
     id: text("id").primaryKey(),
-    workspace_id: text("workspace_id")
-      .notNull()
-      .references(() => workspaces.id, { onDelete: "cascade" }),
-    user_id: text("user_id")
-      .notNull()
-      .references(() => localUsers.id, { onDelete: "cascade" }),
-    role: text("role", { enum: workspaceRoleValues }).notNull().default("owner"),
-    created_at: text("created_at").notNull().default(isoNow)
+    workspaceId: text("workspace_id").notNull(),
+    userId: text("user_id").notNull(),
+    role: text("role").notNull().default("owner"),
+    createdAt: text("created_at").notNull()
   },
-  (table) => [
-    uniqueIndex("workspace_members_workspace_user_uidx").on(table.workspace_id, table.user_id),
-    check("workspace_members_role_check", enumCheck(table.role, workspaceRoleValues))
-  ]
+  (table) => [uniqueIndex("workspace_members_workspace_user_idx").on(table.workspaceId, table.userId)]
 );
+
+export const repositoryVersions = sqliteTable("repository_versions", {
+  id: text("id").primaryKey(),
+  workspaceId: text("workspace_id").notNull(),
+  userId: text("user_id").notNull(),
+  repositoryId: text("repository_id").notNull(),
+  name: text("name").notNull(),
+  description: text("description"),
+  targetDate: text("target_date"),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+  archivedAt: text("archived_at"),
+  deletedAt: text("deleted_at")
+});
 
 export const repositories = sqliteTable(
   "repositories",
   {
     id: text("id").primaryKey(),
-    workspace_id: text("workspace_id")
-      .notNull()
-      .references(() => workspaces.id, { onDelete: "cascade" }),
-    user_id: text("user_id")
-      .notNull()
-      .references(() => localUsers.id, { onDelete: "cascade" }),
-    provider: text("provider", { enum: repositoryProviderValues }).notNull().default("manual"),
+    workspaceId: text("workspace_id").notNull(),
+    userId: text("user_id").notNull(),
+    provider: text("provider").notNull().default("manual"),
     name: text("name").notNull(),
     description: text("description"),
-    html_url: text("html_url"),
-    github_host: text("github_host"),
-    github_owner: text("github_owner"),
-    github_repo: text("github_repo"),
-    github_full_name: text("github_full_name"),
-    production_status: text("production_status", { enum: productionStatusValues }).notNull().default("development"),
-    criticality: text("criticality", { enum: criticalityValues }).notNull().default("medium"),
-    current_focus: text("current_focus"),
-    next_version_id: text("next_version_id"),
-    is_favorite: integer("is_favorite", { mode: "boolean" }).notNull().default(false),
-    sort_order: integer("sort_order"),
-    created_at: text("created_at").notNull().default(isoNow),
-    updated_at: text("updated_at").notNull().default(isoNow),
-    archived_at: text("archived_at"),
-    deleted_at: text("deleted_at")
+    htmlUrl: text("html_url"),
+    githubHost: text("github_host"),
+    githubOwner: text("github_owner"),
+    githubRepo: text("github_repo"),
+    githubFullName: text("github_full_name"),
+    productionStatus: text("production_status").notNull().default("development"),
+    criticality: text("criticality").notNull().default("medium"),
+    currentFocus: text("current_focus"),
+    nextVersionId: text("next_version_id"),
+    isFavorite: integer("is_favorite", { mode: "boolean" }).notNull().default(false),
+    sortOrder: integer("sort_order"),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+    archivedAt: text("archived_at"),
+    deletedAt: text("deleted_at")
   },
-  (table) => [
-    index("repositories_workspace_updated_idx").on(table.workspace_id, table.updated_at),
-    check("repositories_provider_check", enumCheck(table.provider, repositoryProviderValues)),
-    check("repositories_production_status_check", enumCheck(table.production_status, productionStatusValues)),
-    check("repositories_criticality_check", enumCheck(table.criticality, criticalityValues))
-  ]
+  (table) => [index("repositories_workspace_idx").on(table.workspaceId, table.updatedAt)]
 );
-
-export const repositoryVersions = sqliteTable("repository_versions", {
-  id: text("id").primaryKey(),
-  workspace_id: text("workspace_id")
-    .notNull()
-    .references(() => workspaces.id, { onDelete: "cascade" }),
-  user_id: text("user_id")
-    .notNull()
-    .references(() => localUsers.id, { onDelete: "cascade" }),
-  repository_id: text("repository_id")
-    .notNull()
-    .references(() => repositories.id, { onDelete: "cascade" }),
-  name: text("name").notNull(),
-  description: text("description"),
-  target_date: text("target_date"),
-  created_at: text("created_at").notNull().default(isoNow),
-  updated_at: text("updated_at").notNull().default(isoNow),
-  archived_at: text("archived_at"),
-  deleted_at: text("deleted_at")
-});
 
 export const workItems = sqliteTable(
   "work_items",
   {
     id: text("id").primaryKey(),
-    workspace_id: text("workspace_id")
-      .notNull()
-      .references(() => workspaces.id, { onDelete: "cascade" }),
-    user_id: text("user_id")
-      .notNull()
-      .references(() => localUsers.id, { onDelete: "cascade" }),
-    repository_id: text("repository_id").references(() => repositories.id, { onDelete: "set null" }),
-    scope: text("scope", { enum: workItemScopeValues }).notNull(),
-    type: text("type", { enum: workItemTypeValues }).notNull(),
+    workspaceId: text("workspace_id").notNull(),
+    userId: text("user_id").notNull(),
+    repositoryId: text("repository_id"),
+    scope: text("scope").notNull(),
+    type: text("type").notNull(),
     title: text("title").notNull(),
     body: text("body"),
     status: text("status").notNull(),
     resolution: text("resolution"),
-    priority: text("priority", { enum: priorityValues }).notNull().default("p2"),
-    source_type: text("source_type", { enum: sourceTypeValues }).notNull().default("manual"),
-    source_ref: text("source_ref"),
-    privacy_level: text("privacy_level", { enum: privacyLevelValues }).notNull().default("normal"),
-    is_pinned: integer("is_pinned", { mode: "boolean" }).notNull().default(false),
-    target_version_id: text("target_version_id").references(() => repositoryVersions.id, { onDelete: "set null" }),
-    due_at: text("due_at"),
-    external_url: text("external_url"),
-    external_provider: text("external_provider", { enum: ["github"] }),
-    external_id: text("external_id"),
-    status_changed_at: text("status_changed_at"),
-    completed_at: text("completed_at"),
-    closed_at: text("closed_at"),
-    archived_at: text("archived_at"),
-    deleted_at: text("deleted_at"),
-    created_at: text("created_at").notNull().default(isoNow),
-    updated_at: text("updated_at").notNull().default(isoNow)
+    priority: text("priority").notNull().default("p2"),
+    sourceType: text("source_type").notNull().default("manual"),
+    sourceRef: text("source_ref"),
+    privacyLevel: text("privacy_level").notNull().default("normal"),
+    isPinned: integer("is_pinned", { mode: "boolean" }).notNull().default(false),
+    targetVersionId: text("target_version_id"),
+    dueAt: text("due_at"),
+    externalUrl: text("external_url"),
+    externalProvider: text("external_provider"),
+    externalId: text("external_id"),
+    statusChangedAt: text("status_changed_at"),
+    completedAt: text("completed_at"),
+    closedAt: text("closed_at"),
+    archivedAt: text("archived_at"),
+    deletedAt: text("deleted_at"),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull()
   },
   (table) => [
-    index("work_items_workspace_updated_idx").on(table.workspace_id, table.updated_at),
-    index("work_items_repository_idx").on(table.repository_id),
-    index("work_items_inbox_idx").on(table.workspace_id, table.type, table.status),
-    check("work_items_scope_check", enumCheck(table.scope, workItemScopeValues)),
-    check("work_items_type_check", enumCheck(table.type, workItemTypeValues)),
-    check("work_items_priority_check", enumCheck(table.priority, priorityValues)),
-    check("work_items_source_type_check", enumCheck(table.source_type, sourceTypeValues)),
-    check("work_items_privacy_level_check", enumCheck(table.privacy_level, privacyLevelValues)),
-    check(
-      "work_items_scope_repository_consistency",
-      sql`((${table.scope} = 'repository' and ${table.repository_id} is not null) or (${table.scope} in ('inbox', 'global') and ${table.repository_id} is null))`
-    ),
-    check("work_items_external_provider_check", sql`${table.external_provider} is null or ${table.external_provider} = 'github'`)
+    index("work_items_workspace_idx").on(table.workspaceId, table.updatedAt),
+    index("work_items_repository_idx").on(table.repositoryId),
+    index("work_items_inbox_idx").on(table.workspaceId, table.type, table.status)
   ]
 );
 
 export const bugDetails = sqliteTable("bug_details", {
   id: text("id").primaryKey(),
-  workspace_id: text("workspace_id")
-    .notNull()
-    .references(() => workspaces.id, { onDelete: "cascade" }),
-  user_id: text("user_id")
-    .notNull()
-    .references(() => localUsers.id, { onDelete: "cascade" }),
-  work_item_id: text("work_item_id")
-    .notNull()
-    .unique()
-    .references(() => workItems.id, { onDelete: "cascade" }),
+  workspaceId: text("workspace_id").notNull(),
+  userId: text("user_id").notNull(),
+  workItemId: text("work_item_id").notNull().unique(),
   severity: text("severity").notNull().default("s3"),
-  reproduction_steps: text("reproduction_steps"),
-  expected_result: text("expected_result"),
-  actual_result: text("actual_result"),
+  reproductionSteps: text("reproduction_steps"),
+  expectedResult: text("expected_result"),
+  actualResult: text("actual_result"),
   environment: text("environment"),
-  fixed_at: text("fixed_at"),
-  created_at: text("created_at").notNull().default(isoNow),
-  updated_at: text("updated_at").notNull().default(isoNow)
+  fixedAt: text("fixed_at"),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull()
 });
 
 export const ideas = sqliteTable("ideas", {
   id: text("id").primaryKey(),
-  workspace_id: text("workspace_id")
-    .notNull()
-    .references(() => workspaces.id, { onDelete: "cascade" }),
-  user_id: text("user_id")
-    .notNull()
-    .references(() => localUsers.id, { onDelete: "cascade" }),
-  work_item_id: text("work_item_id")
-    .notNull()
-    .unique()
-    .references(() => workItems.id, { onDelete: "cascade" }),
-  value_hypothesis: text("value_hypothesis"),
-  target_user: text("target_user"),
+  workspaceId: text("workspace_id").notNull(),
+  userId: text("user_id").notNull(),
+  workItemId: text("work_item_id").notNull().unique(),
+  valueHypothesis: text("value_hypothesis"),
+  targetUser: text("target_user"),
   feasibility: text("feasibility"),
   decision: text("decision"),
-  promoted_work_item_id: text("promoted_work_item_id").references(() => workItems.id, { onDelete: "set null" }),
-  created_at: text("created_at").notNull().default(isoNow),
-  updated_at: text("updated_at").notNull().default(isoNow)
+  promotedWorkItemId: text("promoted_work_item_id"),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull()
 });
 
-export const techNotes = sqliteTable(
-  "tech_notes",
-  {
-    id: text("id").primaryKey(),
-    workspace_id: text("workspace_id")
-      .notNull()
-      .references(() => workspaces.id, { onDelete: "cascade" }),
-    user_id: text("user_id")
-      .notNull()
-      .references(() => localUsers.id, { onDelete: "cascade" }),
-    repository_id: text("repository_id").references(() => repositories.id, { onDelete: "set null" }),
-    name: text("name").notNull(),
-    category: text("category"),
-    adoption_status: text("adoption_status").notNull().default("candidate"),
-    reason: text("reason"),
-    official_url: text("official_url"),
-    concerns: text("concerns"),
-    created_at: text("created_at").notNull().default(isoNow),
-    updated_at: text("updated_at").notNull().default(isoNow),
-    archived_at: text("archived_at"),
-    deleted_at: text("deleted_at")
-  },
-  (table) => [index("tech_notes_workspace_updated_idx").on(table.workspace_id, table.updated_at)]
-);
+export const techNotes = sqliteTable("tech_notes", {
+  id: text("id").primaryKey(),
+  workspaceId: text("workspace_id").notNull(),
+  userId: text("user_id").notNull(),
+  repositoryId: text("repository_id"),
+  name: text("name").notNull(),
+  category: text("category"),
+  adoptionStatus: text("adoption_status").notNull().default("candidate"),
+  reason: text("reason"),
+  officialUrl: text("official_url"),
+  concerns: text("concerns"),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+  archivedAt: text("archived_at"),
+  deletedAt: text("deleted_at")
+});
 
-export const referenceServices = sqliteTable(
-  "reference_services",
-  {
-    id: text("id").primaryKey(),
-    workspace_id: text("workspace_id")
-      .notNull()
-      .references(() => workspaces.id, { onDelete: "cascade" }),
-    user_id: text("user_id")
-      .notNull()
-      .references(() => localUsers.id, { onDelete: "cascade" }),
-    repository_id: text("repository_id").references(() => repositories.id, { onDelete: "set null" }),
-    name: text("name").notNull(),
-    url: text("url"),
-    reference_point: text("reference_point"),
-    strengths: text("strengths"),
-    concerns: text("concerns"),
-    created_at: text("created_at").notNull().default(isoNow),
-    updated_at: text("updated_at").notNull().default(isoNow),
-    archived_at: text("archived_at"),
-    deleted_at: text("deleted_at")
-  },
-  (table) => [index("reference_services_workspace_updated_idx").on(table.workspace_id, table.updated_at)]
-);
+export const referenceServices = sqliteTable("reference_services", {
+  id: text("id").primaryKey(),
+  workspaceId: text("workspace_id").notNull(),
+  userId: text("user_id").notNull(),
+  repositoryId: text("repository_id"),
+  name: text("name").notNull(),
+  url: text("url"),
+  referencePoint: text("reference_point"),
+  strengths: text("strengths"),
+  concerns: text("concerns"),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+  archivedAt: text("archived_at"),
+  deletedAt: text("deleted_at")
+});
 
 export const tags = sqliteTable(
   "tags",
   {
     id: text("id").primaryKey(),
-    workspace_id: text("workspace_id")
-      .notNull()
-      .references(() => workspaces.id, { onDelete: "cascade" }),
-    user_id: text("user_id")
-      .notNull()
-      .references(() => localUsers.id, { onDelete: "cascade" }),
+    workspaceId: text("workspace_id").notNull(),
+    userId: text("user_id").notNull(),
     name: text("name").notNull(),
     color: text("color"),
-    created_at: text("created_at").notNull().default(isoNow)
+    createdAt: text("created_at").notNull()
   },
-  (table) => [uniqueIndex("tags_workspace_name_uidx").on(table.workspace_id, table.name)]
+  (table) => [uniqueIndex("tags_workspace_name_idx").on(table.workspaceId, table.name)]
 );
 
 export const workItemTags = sqliteTable(
   "work_item_tags",
   {
     id: text("id").primaryKey(),
-    workspace_id: text("workspace_id")
-      .notNull()
-      .references(() => workspaces.id, { onDelete: "cascade" }),
-    user_id: text("user_id")
-      .notNull()
-      .references(() => localUsers.id, { onDelete: "cascade" }),
-    work_item_id: text("work_item_id")
-      .notNull()
-      .references(() => workItems.id, { onDelete: "cascade" }),
-    tag_id: text("tag_id")
-      .notNull()
-      .references(() => tags.id, { onDelete: "cascade" }),
-    created_at: text("created_at").notNull().default(isoNow)
+    workspaceId: text("workspace_id").notNull(),
+    userId: text("user_id").notNull(),
+    workItemId: text("work_item_id").notNull(),
+    tagId: text("tag_id").notNull(),
+    createdAt: text("created_at").notNull()
   },
-  (table) => [uniqueIndex("work_item_tags_work_item_tag_uidx").on(table.work_item_id, table.tag_id)]
+  (table) => [uniqueIndex("work_item_tags_work_item_tag_idx").on(table.workItemId, table.tagId)]
 );
 
 export const statusHistories = sqliteTable(
   "status_histories",
   {
     id: text("id").primaryKey(),
-    workspace_id: text("workspace_id")
-      .notNull()
-      .references(() => workspaces.id, { onDelete: "cascade" }),
-    user_id: text("user_id")
-      .notNull()
-      .references(() => localUsers.id, { onDelete: "cascade" }),
-    work_item_id: text("work_item_id")
-      .notNull()
-      .references(() => workItems.id, { onDelete: "cascade" }),
-    from_status: text("from_status"),
-    to_status: text("to_status").notNull(),
+    workspaceId: text("workspace_id").notNull(),
+    userId: text("user_id").notNull(),
+    workItemId: text("work_item_id").notNull(),
+    fromStatus: text("from_status"),
+    toStatus: text("to_status").notNull(),
     reason: text("reason"),
-    created_at: text("created_at").notNull().default(isoNow)
+    createdAt: text("created_at").notNull()
   },
-  (table) => [index("status_histories_work_item_idx").on(table.work_item_id, table.created_at)]
+  (table) => [index("status_histories_work_item_idx").on(table.workItemId, table.createdAt)]
 );
 
-export const classificationCandidates = sqliteTable(
-  "classification_candidates",
-  {
-    id: text("id").primaryKey(),
-    workspace_id: text("workspace_id")
-      .notNull()
-      .references(() => workspaces.id, { onDelete: "cascade" }),
-    user_id: text("user_id")
-      .notNull()
-      .references(() => localUsers.id, { onDelete: "cascade" }),
-    memo_work_item_id: text("memo_work_item_id")
-      .notNull()
-      .references(() => workItems.id, { onDelete: "cascade" }),
-    target_type: text("target_type", { enum: workItemTypeValues }).notNull(),
-    title: text("title").notNull(),
-    body: text("body"),
-    confidence: text("confidence").notNull().default("medium"),
-    parse_source: text("parse_source"),
-    parse_error: text("parse_error"),
-    applied_at: text("applied_at"),
-    created_at: text("created_at").notNull().default(isoNow)
-  },
-  (table) => [check("classification_candidates_target_type_check", enumCheck(table.target_type, workItemTypeValues))]
-);
+export const classificationCandidates = sqliteTable("classification_candidates", {
+  id: text("id").primaryKey(),
+  workspaceId: text("workspace_id").notNull(),
+  userId: text("user_id").notNull(),
+  memoWorkItemId: text("memo_work_item_id").notNull(),
+  targetType: text("target_type").notNull(),
+  title: text("title").notNull(),
+  body: text("body"),
+  confidence: text("confidence").notNull().default("medium"),
+  parseSource: text("parse_source"),
+  parseError: text("parse_error"),
+  appliedAt: text("applied_at"),
+  createdAt: text("created_at").notNull()
+});
 
 export const exportLogs = sqliteTable("export_logs", {
   id: text("id").primaryKey(),
-  workspace_id: text("workspace_id")
-    .notNull()
-    .references(() => workspaces.id, { onDelete: "cascade" }),
-  user_id: text("user_id")
-    .notNull()
-    .references(() => localUsers.id, { onDelete: "cascade" }),
+  workspaceId: text("workspace_id").notNull(),
+  userId: text("user_id").notNull(),
   format: text("format").notNull(),
-  content_hash: text("content_hash"),
-  created_at: text("created_at").notNull().default(isoNow)
+  contentHash: text("content_hash"),
+  createdAt: text("created_at").notNull()
 });
 
 export const importJobs = sqliteTable("import_jobs", {
   id: text("id").primaryKey(),
-  workspace_id: text("workspace_id")
-    .notNull()
-    .references(() => workspaces.id, { onDelete: "cascade" }),
-  user_id: text("user_id")
-    .notNull()
-    .references(() => localUsers.id, { onDelete: "cascade" }),
+  workspaceId: text("workspace_id").notNull(),
+  userId: text("user_id").notNull(),
   status: text("status").notNull().default("created"),
-  source_format: text("source_format").notNull().default("json"),
-  error_message: text("error_message"),
-  created_at: text("created_at").notNull().default(isoNow),
-  finished_at: text("finished_at")
+  sourceFormat: text("source_format").notNull().default("json"),
+  errorMessage: text("error_message"),
+  createdAt: text("created_at").notNull(),
+  finishedAt: text("finished_at")
 });
-
-export type LocalUser = typeof localUsers.$inferSelect;
-export type Workspace = typeof workspaces.$inferSelect;
-export type Repository = typeof repositories.$inferSelect;
-export type WorkItem = typeof workItems.$inferSelect;
