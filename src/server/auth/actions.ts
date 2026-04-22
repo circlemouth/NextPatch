@@ -4,7 +4,7 @@ import crypto from "node:crypto";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { getAuthConfig, SESSION_COOKIE_NAME } from "@/server/auth/config";
-import { getLoginPath, sanitizeNextPath } from "@/server/auth/redirects";
+import { DEFAULT_AUTH_REDIRECT_PATH, getLoginPath, sanitizeNextPath } from "@/server/auth/redirects";
 import { createSessionToken } from "@/server/auth/session-token";
 
 export async function loginAction(formData: FormData) {
@@ -42,7 +42,7 @@ export async function loginAction(formData: FormData) {
     maxAge: config.sessionMaxAgeSeconds
   });
 
-  redirect(nextPath || "/dashboard");
+  redirect(nextPath || DEFAULT_AUTH_REDIRECT_PATH);
 }
 
 export async function logoutAction() {

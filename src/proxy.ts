@@ -8,7 +8,7 @@ export async function proxy(request: NextRequest) {
 
   if (pathname === "/login") {
     if (authenticated) {
-      return NextResponse.redirect(new URL("/dashboard", request.url), 303);
+      return NextResponse.redirect(new URL("/repositories", request.url), 303);
     }
 
     return NextResponse.next();

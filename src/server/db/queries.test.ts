@@ -30,7 +30,13 @@ import { LOCAL_USER_ID, PERSONAL_WORKSPACE_ID } from "@/server/auth/session";
 import { closeDatabaseConnection, getSqlite } from "@/server/db/client";
 import { classifyMemoCommand, quickCaptureCommand } from "@/server/db/queries/classification";
 import { listDashboardWorkItems } from "@/server/db/queries/dashboard";
-import { archiveRepositoryCommand, createRepositoryCommand, getRepositoryById, listRepositories } from "@/server/db/queries/repositories";
+import {
+  archiveRepositoryCommand,
+  createRepositoryCommand,
+  getRepositoryById,
+  listRepositories,
+  listRepositorySummaries
+} from "@/server/db/queries/repositories";
 import {
   createWorkItemCommand,
   getWorkItemById,
@@ -130,6 +136,62 @@ describe("SQLite repository queries", () => {
     await archiveRepositoryCommand(ctx.workspaceId, id);
 
     expect(await listRepositories(ctx.workspaceId)).toEqual([]);
+  });
+
+  it("summarizes repository activity, open work items, and memo counts", async () => {
+    const ctx = setup();
+    const repositoryId = await createRepositoryCommand({
+      workspaceId: ctx.workspaceId,
+      userId: ctx.userId,
+      provider: "manual",
+      name: "Summary repo",
+      productionStatus: "development",
+      criticality: "medium"
+    });
+    const now = "2026-04-21T00:00:00.000Z";
+    const later = "2026-04-21T03:00:00.000Z";
+
+    getSqlite().prepare("update repositories set updated_at = ? where id = ?").run(now, repositoryId);
+
+    const openTaskId = await createWorkItemCommand({
+      workspaceId: ctx.workspaceId,
+      userId: ctx.userId,
+      repositoryId,
+      scope: "repository",
+      type: "task",
+      title: "Open task",
+      status: "todo",
+      priority: "p2",
+      sourceType: "manual",
+      privacyLevel: "normal",
+      isPinned: false
+    });
+    const memoId = await quickCaptureCommand({
+      workspaceId: ctx.workspaceId,
+      userId: ctx.userId,
+      repositoryId,
+      scope: "repository",
+      type: "memo",
+      title: "Repository memo",
+      body: "memo body",
+      privacyLevel: "normal",
+      isPinned: false,
+      sourceType: "manual",
+      importResult: { format: "markdown", candidates: [] }
+    });
+    getSqlite().prepare("update work_items set updated_at = ? where id = ?").run(now, openTaskId);
+    getSqlite().prepare("update work_items set updated_at = ? where id = ?").run(later, memoId);
+
+    expect(await listRepositorySummaries(ctx.workspaceId)).toEqual([
+      expect.objectContaining({
+        id: repositoryId,
+        open_item_count: 2,
+        memo_count: 1,
+        last_activity_at: later
+      })
+    ]);
+
+    expect(getSqlite().prepare("select id from work_items where id in (?, ?)").all(openTaskId, memoId)).toHaveLength(2);
   });
 
   it("gets only active repositories by id", async () => {

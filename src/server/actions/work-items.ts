@@ -24,15 +24,20 @@ export async function createWorkItem(formData: FormData) {
   }
   const parsed = parsedResult.data;
   const repositoryId = parsed.repositoryId || null;
+  const title = parsed.title?.trim() || firstLine(parsed.body);
+  if (!title) {
+    throw new Error("Title or body is required");
+  }
+
   const scope = repositoryId ? "repository" : parsed.type === "memo" ? "inbox" : "global";
 
-  const id = await createWorkItemCommand({
+  await createWorkItemCommand({
     workspaceId: workspace.id,
     userId: user.id,
     repositoryId,
     scope,
     type: parsed.type,
-    title: parsed.title,
+    title,
     body: parsed.body || null,
     status: defaultStatus(parsed.type),
     priority: parsed.priority,
@@ -43,8 +48,14 @@ export async function createWorkItem(formData: FormData) {
     externalProvider: parsed.externalUrl?.includes("github.com") ? "github" : null
   });
 
+  revalidatePath("/repositories");
   revalidatePath("/work-items");
-  redirect(`/work-items/${id}`);
+  const redirectPath = repositoryId ? `/repositories/${repositoryId}` : "/repositories";
+  if (repositoryId) {
+    revalidatePath(`/repositories/${repositoryId}`);
+  }
+
+  redirect(redirectPath);
 }
 
 export async function updateWorkItemStatus(formData: FormData) {
@@ -58,4 +69,12 @@ export async function updateWorkItemStatus(formData: FormData) {
 
   revalidatePath("/dashboard");
   revalidatePath("/work-items");
+}
+
+function firstLine(value?: string | null) {
+  if (!value) {
+    return "";
+  }
+
+  return value.split(/\r?\n/).find(Boolean)?.slice(0, 80) || "";
 }

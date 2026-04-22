@@ -1,27 +1,29 @@
+export const DEFAULT_AUTH_REDIRECT_PATH = "/repositories";
+
 export function sanitizeNextPath(input: string | null | undefined): string {
   if (!input) {
-    return "/dashboard";
+    return DEFAULT_AUTH_REDIRECT_PATH;
   }
 
   const trimmed = input.trim();
   if (isUnsafeNextPath(trimmed)) {
-    return "/dashboard";
+    return DEFAULT_AUTH_REDIRECT_PATH;
   }
 
   try {
     const parsed = new URL(trimmed, "http://nextpatch.local");
     if (parsed.origin !== "http://nextpatch.local" || !parsed.pathname.startsWith("/")) {
-      return "/dashboard";
+      return DEFAULT_AUTH_REDIRECT_PATH;
     }
 
     const safePath = `${parsed.pathname}${parsed.search}${parsed.hash}`;
     if (isUnsafeNextPath(safePath)) {
-      return "/dashboard";
+      return DEFAULT_AUTH_REDIRECT_PATH;
     }
 
     return safePath;
   } catch {
-    return "/dashboard";
+    return DEFAULT_AUTH_REDIRECT_PATH;
   }
 }
 

@@ -1,7 +1,7 @@
 "use server";
 
 import { requireLocalContext } from "@/server/auth/session";
-import { archiveRepositoryCommand, createRepositoryCommand } from "@/server/db/queries/repositories";
+import { archiveRepositoryCommand, createRepositoryCommand, updateRepositoryFocusCommand } from "@/server/db/queries/repositories";
 import { parseGitHubUrl } from "@/server/domain/github-url";
 import { repositorySchema } from "@/server/validation/schemas";
 import { revalidatePath } from "next/cache";
@@ -36,6 +36,22 @@ export async function createRepository(formData: FormData) {
   });
 
   revalidatePath("/repositories");
+  redirect(`/repositories/${id}`);
+}
+
+export async function updateRepositoryFocus(formData: FormData) {
+  const { workspace } = await requireLocalContext();
+  const id = String(formData.get("id") ?? "");
+  const currentFocus = String(formData.get("currentFocus") ?? "").trim();
+
+  if (!id) {
+    throw new Error("Repository id is required");
+  }
+
+  await updateRepositoryFocusCommand(workspace.id, id, currentFocus.length > 0 ? currentFocus : null);
+
+  revalidatePath("/repositories");
+  revalidatePath(`/repositories/${id}`);
   redirect(`/repositories/${id}`);
 }
 
