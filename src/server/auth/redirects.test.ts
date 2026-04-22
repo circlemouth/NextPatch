@@ -1,31 +1,33 @@
 import { describe, expect, it } from "vitest";
-import { getLoginPath, isProtectedPath, isPublicPath, sanitizeNextPath } from "./redirects";
+import { DEFAULT_AUTH_REDIRECT_PATH, getLoginPath, isProtectedPath, isPublicPath, sanitizeNextPath } from "./redirects";
 
 describe("sanitizeNextPath", () => {
   it("keeps internal paths", () => {
-    expect(sanitizeNextPath("/dashboard?tab=summary")).toBe("/dashboard?tab=summary");
+    expect(sanitizeNextPath("/settings?tab=data")).toBe("/settings?tab=data");
   });
 
   it("rejects normalized protocol-relative paths", () => {
-    expect(sanitizeNextPath("/..//evil.example")).toBe("/repositories");
-    expect(sanitizeNextPath("/%2e%2e//evil.example")).toBe("/repositories");
+    expect(sanitizeNextPath("/..//evil.example")).toBe(DEFAULT_AUTH_REDIRECT_PATH);
+    expect(sanitizeNextPath("/%2e%2e//evil.example")).toBe(DEFAULT_AUTH_REDIRECT_PATH);
   });
 
   it("rejects external URLs", () => {
-    expect(sanitizeNextPath("https://evil.example")).toBe("/repositories");
+    expect(sanitizeNextPath("https://evil.example")).toBe(DEFAULT_AUTH_REDIRECT_PATH);
   });
 
   it("rejects protocol-relative URLs", () => {
-    expect(sanitizeNextPath("//evil.example")).toBe("/repositories");
+    expect(sanitizeNextPath("//evil.example")).toBe(DEFAULT_AUTH_REDIRECT_PATH);
   });
 
   it("falls back to repositories when missing", () => {
-    expect(sanitizeNextPath(undefined)).toBe("/repositories");
+    expect(sanitizeNextPath(undefined)).toBe(DEFAULT_AUTH_REDIRECT_PATH);
   });
 });
 
 describe("path guards", () => {
   it("treats app routes as protected", () => {
+    expect(isProtectedPath("/repositories")).toBe(true);
+    expect(isProtectedPath("/repositories/foo")).toBe(true);
     expect(isProtectedPath("/dashboard")).toBe(true);
     expect(isProtectedPath("/api/export/json")).toBe(true);
     expect(isProtectedPath("/login")).toBe(false);

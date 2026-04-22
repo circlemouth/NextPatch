@@ -13,35 +13,38 @@ export default async function AppLayout({
 
   return (
     <div className="app-shell">
-      <div className="main-area">
-        <header className="topbar">
-          <div className="topbar__brand-block">
-            <Link className="topbar__brand" href="/repositories">
-              NextPatch
-            </Link>
-            <p className="support">ログイン中: {workspace.name}</p>
-          </div>
-          <details className="topbar-menu">
-            <summary className="button button--secondary topbar-menu__summary">メニュー</summary>
-            <div className="topbar-menu__panel" role="menu" aria-label="Topbar menu">
-              <Link className="topbar-menu__item" href="/settings" role="menuitem">
-                設定
+      <div className="app-frame">
+        <div className="main-area">
+          <header className="topbar">
+            <div className="topbar__brand-group">
+              <Link className="topbar__brand" href="/repositories">
+                NextPatch
               </Link>
-              <Link className="topbar-menu__item" href="/settings/data" role="menuitem">
-                データ管理
-              </Link>
-              <Link className="topbar-menu__item" href="/settings/system" role="menuitem">
-                システム状態
-              </Link>
-              <form action={logoutAction}>
-                <button className="topbar-menu__item topbar-menu__action" type="submit">
-                  ログアウト
-                </button>
-              </form>
+              <p className="support topbar__workspace">ログイン中: {workspace.name}</p>
             </div>
-          </details>
-        </header>
-        {children}
+
+            <details className="topbar-menu">
+              <summary className="button button--secondary topbar-menu__summary">設定メニュー</summary>
+              <div className="topbar-menu__panel" role="menu" aria-label="設定メニュー">
+                <Link className="topbar-menu__link" href="/settings" role="menuitem">
+                  設定
+                </Link>
+                <Link className="topbar-menu__link" href="/settings/data" role="menuitem">
+                  データ管理
+                </Link>
+                <Link className="topbar-menu__link" href="/settings/system" role="menuitem">
+                  システム状態
+                </Link>
+                <form action={logoutAction} className="topbar-menu__form">
+                  <button className="topbar-menu__link topbar-menu__button" type="submit">
+                    ログアウト
+                  </button>
+                </form>
+              </div>
+            </details>
+          </header>
+          {children}
+        </div>
       </div>
     </div>
   );

@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 import Database from "better-sqlite3";
 
 const LOCAL_USER_ID = "local-user";
@@ -140,7 +141,7 @@ export function initializeDatabase(dbPath = getDatabasePath(), migrationDir = DE
   seedDatabase(dbPath);
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (import.meta.url === pathToFileURL(process.argv[1]).href) {
   const dbPath = getDatabasePath();
   initializeDatabase(dbPath);
   console.log(`Initialized SQLite database at ${dbPath}`);

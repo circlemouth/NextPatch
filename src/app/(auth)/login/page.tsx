@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { loginAction } from "@/server/auth/actions";
 import { getAuthConfig } from "@/server/auth/config";
-import { sanitizeNextPath } from "@/server/auth/redirects";
+import { DEFAULT_AUTH_REDIRECT_PATH, sanitizeNextPath } from "@/server/auth/redirects";
 import { getAuthenticatedLocalContext } from "@/server/auth/session";
 
 export const dynamic = "force-dynamic";
@@ -27,7 +27,7 @@ type LoginPageProps = {
 
 export default async function LoginPage({ searchParams }: LoginPageProps) {
   if (await getAuthenticatedLocalContext()) {
-    redirect("/repositories");
+    redirect(DEFAULT_AUTH_REDIRECT_PATH);
   }
 
   const params = await searchParams;

@@ -1,11 +1,10 @@
 import { and, desc, eq, isNull } from "drizzle-orm";
 import { getDb } from "@/server/db/client";
-import { repositories } from "@/server/db/schema";
+import { repositories, workItems } from "@/server/db/schema";
 import { isOpen } from "@/server/domain/status";
-import type { Criticality, ProductionStatus, RepositoryRow, RepositorySummaryRow } from "@/server/types";
+import type { RepositoryRow, RepositorySummaryRow } from "@/server/types";
 import { assertPersonalWorkspaceScope } from "./context";
-import { toRepositoryRow } from "./mappers";
-import { listWorkItems } from "./work-items";
+import { toRepositoryRow, toWorkItemRow } from "./mappers";
 
 type CreateRepositoryInput = {
   workspaceId: string;
@@ -18,8 +17,8 @@ type CreateRepositoryInput = {
   githubOwner?: string | null;
   githubRepo?: string | null;
   githubFullName?: string | null;
-  productionStatus: ProductionStatus;
-  criticality: Criticality;
+  productionStatus: RepositoryRow["production_status"];
+  criticality: RepositoryRow["criticality"];
   currentFocus?: string | null;
 };
 
@@ -98,50 +97,54 @@ export async function listRepositories(workspaceId: string): Promise<RepositoryR
 export async function listRepositorySummaries(workspaceId: string): Promise<RepositorySummaryRow[]> {
   assertPersonalWorkspaceScope(workspaceId);
 
-  const [repositoriesList, workItems] = await Promise.all([listRepositories(workspaceId), listWorkItems(workspaceId)]);
-  const summaries = new Map<string, RepositorySummaryRow>();
+  const repositoryRows = getDb()
+    .select()
+    .from(repositories)
+    .where(and(eq(repositories.workspaceId, workspaceId), isNull(repositories.archivedAt), isNull(repositories.deletedAt)))
+    .orderBy(desc(repositories.updatedAt))
+    .all();
+  const workItemRows = getDb()
+    .select()
+    .from(workItems)
+    .where(and(eq(workItems.workspaceId, workspaceId), isNull(workItems.archivedAt), isNull(workItems.deletedAt)))
+    .all();
 
-  for (const repository of repositoriesList) {
-    summaries.set(repository.id, {
-      ...repository,
-      open_item_count: 0,
-      memo_count: 0,
-      last_activity_at: repository.updated_at
-    });
-  }
+  const counts = new Map<string, { openItemCount: number; memoCount: number; lastActivityAt: string | null }>();
 
-  for (const item of workItems) {
+  for (const itemRow of workItemRows) {
+    const item = toWorkItemRow(itemRow);
+
     if (!item.repository_id) {
       continue;
     }
 
-    const summary = summaries.get(item.repository_id);
-    if (!summary) {
-      continue;
-    }
+    const entry = counts.get(item.repository_id) ?? {
+      openItemCount: 0,
+      memoCount: 0,
+      lastActivityAt: null
+    };
 
     if (isOpen(item)) {
-      summary.open_item_count += 1;
+      entry.openItemCount += 1;
     }
 
     if (item.type === "memo") {
-      summary.memo_count += 1;
+      entry.memoCount += 1;
     }
 
-    if (!summary.last_activity_at || item.updated_at > summary.last_activity_at) {
-      summary.last_activity_at = item.updated_at;
-    }
+    entry.lastActivityAt = latestIso(entry.lastActivityAt, item.updated_at);
+    counts.set(item.repository_id, entry);
   }
 
-  return repositoriesList.map(
-    (repository) =>
-      summaries.get(repository.id) ?? {
-        ...repository,
-        open_item_count: 0,
-        memo_count: 0,
-        last_activity_at: repository.updated_at
-      }
-  );
+  return repositoryRows.map((repository) => {
+    const summary = counts.get(repository.id);
+    return {
+      ...toRepositoryRow(repository),
+      open_item_count: summary?.openItemCount ?? 0,
+      memo_count: summary?.memoCount ?? 0,
+      last_activity_at: latestIso(repository.updatedAt, summary?.lastActivityAt ?? null)
+    };
+  });
 }
 
 export async function getRepositoryById(workspaceId: string, id: string): Promise<RepositoryRow | null> {
@@ -184,4 +187,10 @@ export function assertActiveRepositoryInWorkspace(workspaceId: string, repositor
   if (!row) {
     throw new Error(`Active repository not found in workspace: ${repositoryId}`);
   }
+}
+
+function latestIso(a: string | null, b: string | null) {
+  if (!a) return b;
+  if (!b) return a;
+  return a > b ? a : b;
 }

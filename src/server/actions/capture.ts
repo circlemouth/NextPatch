@@ -43,6 +43,7 @@ export async function quickCapture(formData: FormData) {
   });
 
   revalidatePath("/repositories");
+  revalidatePath("/work-items");
   revalidatePath("/inbox");
   if (repositoryId) {
     revalidatePath(`/repositories/${repositoryId}`);

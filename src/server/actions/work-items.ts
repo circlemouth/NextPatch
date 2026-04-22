@@ -44,8 +44,8 @@ export async function createWorkItem(formData: FormData) {
     externalProvider: parsed.externalUrl?.includes("github.com") ? "github" : null
   });
 
-  revalidatePath("/work-items");
   revalidatePath("/repositories");
+  revalidatePath("/work-items");
   if (repositoryId) {
     revalidatePath(`/repositories/${repositoryId}`);
     redirect(`/repositories/${repositoryId}`);
