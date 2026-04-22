@@ -3,7 +3,7 @@
 ## Repo Overview
 
 - NextPatch は、リポジトリ作業、バグ、アイデア、実装メモ、ChatGPT の貼り付けメモ、次に取るべきアクションを整理するための、自己管理型のローカルサーバー Web アプリです。
-- MVP はローカルの単一ユーザー向けです。認証は未実装で、既定では localhost 前提です。LAN や公開インターネットに露出させる前提ではありません。
+- MVP はローカルの単一ユーザー向けです。共通パスワードログインと署名付き HttpOnly Cookie セッションを備え、既定では localhost 前提です。LAN や公開インターネットに露出させる前提ではありません。
 - GitHub 連携は URL 解析が中心で、ChatGPT 連携は手動貼り付けとローカルの JSON / Markdown 解析が中心です。
 - 画面側は `src/app/`、サーバー側は `src/server/`、運用スクリプトは `scripts/`、設計メモや実装計画は `docs/` にあります。
 
@@ -19,7 +19,7 @@
 - SQLite 移行の正本は `drizzle/*.sql` の手書き SQL です。`db:generate` は使わないこと。
 - `src/server/db/schema.ts` は Drizzle の型付け用で、制約の正本ではありません。
 - `data/`、`exports/`、`backups/` は Git 管理から外す前提です。DB バックアップは JSON エクスポートか SQLite 安全な方法を優先します。
-- `/login` はログイン機能ではなく、`/repositories` への安全なリダイレクト用です。
+- `/login` はログイン画面で、ログイン後の既定遷移先は `/repositories` です。旧ルートの `/dashboard` は互換用に残しても構いませんが、主導線にはしません。
 - 外部公開を前提にした変更をする場合は、先に HTTPS と明示的なアクセス制御を追加してください。
 
 ## Workspace Cleanup Rule

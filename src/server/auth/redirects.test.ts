@@ -2,7 +2,14 @@ import { describe, expect, it } from "vitest";
 import { DEFAULT_AUTH_REDIRECT_PATH, getLoginPath, isProtectedPath, isPublicPath, sanitizeNextPath } from "./redirects";
 
 describe("sanitizeNextPath", () => {
+  it("uses repositories as the default fallback", () => {
+    expect(sanitizeNextPath(undefined)).toBe(DEFAULT_AUTH_REDIRECT_PATH);
+    expect(sanitizeNextPath(null)).toBe(DEFAULT_AUTH_REDIRECT_PATH);
+    expect(sanitizeNextPath("   ")).toBe(DEFAULT_AUTH_REDIRECT_PATH);
+  });
+
   it("keeps internal paths", () => {
+    expect(sanitizeNextPath("/repositories?tab=summary")).toBe("/repositories?tab=summary");
     expect(sanitizeNextPath("/settings?tab=data")).toBe("/settings?tab=data");
   });
 
@@ -17,10 +24,6 @@ describe("sanitizeNextPath", () => {
 
   it("rejects protocol-relative URLs", () => {
     expect(sanitizeNextPath("//evil.example")).toBe(DEFAULT_AUTH_REDIRECT_PATH);
-  });
-
-  it("falls back to repositories when missing", () => {
-    expect(sanitizeNextPath(undefined)).toBe(DEFAULT_AUTH_REDIRECT_PATH);
   });
 });
 

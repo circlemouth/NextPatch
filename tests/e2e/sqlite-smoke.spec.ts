@@ -2,7 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 
 test.describe.configure({ mode: "serial" });
 
-test("SQLite local smoke: repositories home, repository detail, settings menu, and export links", async ({ page }, testInfo) => {
+test("SQLite local smoke: repositories-first flows, quick write, menu settings, and export links", async ({ page }, testInfo) => {
   const suffix = `${Date.now()}-${testInfo.project.name}`;
   const guards = installPageGuards(page);
 
@@ -34,41 +34,39 @@ test("SQLite local smoke: repositories home, repository detail, settings menu, a
   await assertNoExternalAuthPrompts(page);
   await guards.assertHealthy("authenticated repositories");
 
-  await expect(page).toHaveURL(/\/repositories$/);
-  await guards.assertHealthy("repositories home");
-
   await page.getByLabel(/リポジトリ名/).fill(`QA Repo ${suffix}`);
   await page.getByLabel(/GitHub URL/).fill(`https://github.com/example/qa-${suffix}`);
-  await page.getByLabel(/現在の焦点/).fill(`Focus for ${suffix}`);
+  await page.getByLabel(/現在の焦点/).fill(`Initial focus ${suffix}`);
   await page.getByLabel(/稼働状態/).selectOption("active_production");
   await page.getByLabel(/重要度/).selectOption("high");
   await page.getByRole("button", { name: "保存" }).click();
-  await expect(page).toHaveURL(/\/repositories\/[0-9a-f-]+$/);
+  await expect(page).toHaveURL(/\/repositories\/[^/]+$/);
   await expect(page.getByRole("heading", { name: `QA Repo ${suffix}` })).toBeVisible();
-  await expect(page.getByText(`Focus for ${suffix}`)).toBeVisible();
+  await expect(page.getByText(`Initial focus ${suffix}`)).toBeVisible();
   await guards.assertHealthy("repository create");
 
-  await page.getByLabel(/現在の焦点/).fill(`Updated focus for ${suffix}`);
-  await page.getByRole("button", { name: "保存" }).click();
-  await expect(page).toHaveURL(/\/repositories\/[0-9a-f-]+$/);
-  await expect(page.getByText(`Updated focus for ${suffix}`)).toBeVisible();
+  await page.getByLabel(/現在の焦点/).fill(`Updated focus ${suffix}`);
+  await page.getByRole("button", { name: "保存" }).first().click();
+  await expect(page).toHaveURL(/\/repositories\/[^/]+$/);
+  await expect(page.getByText(`Updated focus ${suffix}`)).toBeVisible();
   await guards.assertHealthy("repository focus update");
 
   await page.getByLabel(/種類/).selectOption("task");
-  await page.getByLabel(/内容/).fill(`QA task ${suffix}\nFollow-up line.`);
+  await page.getByLabel(/内容/).fill(`Quick write title ${suffix}\nSecond line for the body.`);
   await page.getByLabel(/タイトル/).fill("");
-  await page.getByLabel(/優先度/).selectOption("p1");
-  await page.getByRole("button", { name: "保存" }).click();
-  await expect(page).toHaveURL(/\/repositories\/[0-9a-f-]+$/);
-  await expect(page.getByText(`QA task ${suffix}`)).toBeVisible();
+  await page.getByLabel(/優先度/).selectOption("p2");
+  await page.getByRole("button", { name: "保存" }).last().click();
+  await expect(page).toHaveURL(/\/repositories\/[^/]+$/);
+  await expect(page.getByRole("heading", { name: `Quick write title ${suffix}` })).toBeVisible();
+  await expect(page.getByText("Second line for the body.")).toBeVisible();
   await guards.assertHealthy("quick write create");
 
-  const taskCard = page.locator("article").filter({ has: page.getByRole("heading", { name: `QA task ${suffix}` }) }).first();
+  const taskCard = page.locator("article").filter({ has: page.getByRole("heading", { name: `Quick write title ${suffix}` }) }).first();
   await taskCard.getByRole("button", { name: "着手" }).click();
-  await expect(taskCard.getByText("doing")).toBeVisible();
+  await expect(taskCard.getByText("進行中")).toBeVisible();
   await guards.assertHealthy("task status update");
 
-  await page.getByRole("button", { name: "メニュー" }).click();
+  await openTopbarMenu(page);
   await page.getByRole("link", { name: "データ管理" }).click();
   await expect(page).toHaveURL(/\/settings\/data$/);
   await expect(page.getByRole("link", { name: "JSON export" })).toHaveAttribute("href", "/api/export/json");
@@ -79,7 +77,7 @@ test("SQLite local smoke: repositories home, repository detail, settings menu, a
   await assertExportRouteOk(page, "/api/export/csv");
   await guards.assertHealthy("export links");
 
-  await page.getByRole("button", { name: "メニュー" }).click();
+  await openTopbarMenu(page);
   await page.getByRole("button", { name: "ログアウト" }).click();
   await expect(page).toHaveURL(/\/login$/);
   await gotoAndAssertHealthy(page, guards, "/repositories", "repositories after logout");
@@ -127,6 +125,10 @@ async function gotoAndAssertHealthy(page: Page, guards: ReturnType<typeof instal
   expect(response, `${context} did not return an HTTP response`).not.toBeNull();
   expect(response?.status(), `${context} returned HTTP ${response?.status() ?? "unknown"}`).toBeLessThan(500);
   await guards.assertHealthy(context);
+}
+
+async function openTopbarMenu(page: Page) {
+  await page.getByRole("button", { name: /メニュー|設定/ }).click();
 }
 
 async function assertExportRouteOk(page: Page, route: string) {

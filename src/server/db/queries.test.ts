@@ -252,6 +252,133 @@ describe("SQLite repository queries", () => {
     expect(await getRepositoryById(ctx.workspaceId, archivedId)).toBeNull();
     expect(await getRepositoryById(ctx.workspaceId, deletedId)).toBeNull();
   });
+
+  it("lists repository summaries with active counts and last activity", async () => {
+    const ctx = setup();
+    const activeRepositoryId = await createRepositoryCommand({
+      workspaceId: ctx.workspaceId,
+      userId: ctx.userId,
+      provider: "manual",
+      name: "Summary repo",
+      productionStatus: "development",
+      criticality: "medium"
+    });
+    const archivedRepositoryId = insertRepositoryDirectly({
+      workspaceId: ctx.workspaceId,
+      userId: ctx.userId,
+      name: "Archived summary repo",
+      archivedAt: "2026-04-21T00:00:00.000Z"
+    });
+    const deletedRepositoryId = insertRepositoryDirectly({
+      workspaceId: ctx.workspaceId,
+      userId: ctx.userId,
+      name: "Deleted summary repo",
+      deletedAt: "2026-04-21T00:00:00.000Z"
+    });
+    const repositoryBaseTime = "2026-04-21T00:00:00.000Z";
+    const activeActivityTime = "2026-04-22T00:00:00.000Z";
+    const ignoredActivityTime = "2026-04-23T00:00:00.000Z";
+
+    getSqlite().prepare("update repositories set updated_at = ? where id = ?").run(repositoryBaseTime, activeRepositoryId);
+
+    const activeOpenId = await createWorkItemCommand({
+      workspaceId: ctx.workspaceId,
+      userId: ctx.userId,
+      repositoryId: activeRepositoryId,
+      scope: "repository",
+      type: "task",
+      title: "Open summary item",
+      status: "todo",
+      priority: "p2",
+      sourceType: "manual",
+      privacyLevel: "normal",
+      isPinned: false
+    });
+    const activeClosedId = await createWorkItemCommand({
+      workspaceId: ctx.workspaceId,
+      userId: ctx.userId,
+      repositoryId: activeRepositoryId,
+      scope: "repository",
+      type: "task",
+      title: "Closed summary item",
+      status: "done",
+      priority: "p2",
+      sourceType: "manual",
+      privacyLevel: "normal",
+      isPinned: false
+    });
+    const activeMemoId = await quickCaptureCommand({
+      workspaceId: ctx.workspaceId,
+      userId: ctx.userId,
+      repositoryId: activeRepositoryId,
+      scope: "repository",
+      type: "memo",
+      title: "Active summary memo",
+      body: "memo body",
+      privacyLevel: "normal",
+      isPinned: false,
+      sourceType: "manual",
+      importResult: { format: "markdown", candidates: [] }
+    });
+    const archivedMemoId = await quickCaptureCommand({
+      workspaceId: ctx.workspaceId,
+      userId: ctx.userId,
+      repositoryId: activeRepositoryId,
+      scope: "repository",
+      type: "memo",
+      title: "Archived summary memo",
+      body: "memo body",
+      privacyLevel: "normal",
+      isPinned: false,
+      sourceType: "manual",
+      importResult: { format: "markdown", candidates: [] }
+    });
+    const deletedBugId = await createWorkItemCommand({
+      workspaceId: ctx.workspaceId,
+      userId: ctx.userId,
+      repositoryId: activeRepositoryId,
+      scope: "repository",
+      type: "bug",
+      title: "Deleted summary bug",
+      status: "unconfirmed",
+      priority: "p2",
+      sourceType: "manual",
+      privacyLevel: "normal",
+      isPinned: false
+    });
+
+    getSqlite().prepare("update work_items set updated_at = ? where id in (?, ?, ?)").run(
+      activeActivityTime,
+      activeOpenId,
+      activeClosedId,
+      activeMemoId
+    );
+    getSqlite().prepare("update work_items set archived_at = ?, updated_at = ? where id = ?").run(
+      ignoredActivityTime,
+      ignoredActivityTime,
+      archivedMemoId
+    );
+    getSqlite().prepare("update work_items set deleted_at = ?, updated_at = ? where id = ?").run(
+      ignoredActivityTime,
+      ignoredActivityTime,
+      deletedBugId
+    );
+
+    const summaries = await listRepositorySummaries(ctx.workspaceId);
+    const summary = summaries.find((item) => item.id === activeRepositoryId);
+
+    expect(summaries.map((item) => item.id)).toContain(activeRepositoryId);
+    expect(summaries.map((item) => item.id)).not.toContain(archivedRepositoryId);
+    expect(summaries.map((item) => item.id)).not.toContain(deletedRepositoryId);
+    expect(summary).toEqual(
+      expect.objectContaining({
+        id: activeRepositoryId,
+        open_item_count: 2,
+        memo_count: 1,
+        last_activity_at: activeActivityTime
+      })
+    );
+  });
 });
 
 describe("SQLite work item and classification queries", () => {
