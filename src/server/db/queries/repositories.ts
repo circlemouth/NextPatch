@@ -1,10 +1,9 @@
-import { and, desc, eq, isNull } from "drizzle-orm";
+import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import { getDb } from "@/server/db/client";
 import { repositories, workItems } from "@/server/db/schema";
-import { isOpen } from "@/server/domain/status";
 import type { RepositoryRow, RepositorySummaryRow } from "@/server/types";
 import { assertPersonalWorkspaceScope } from "./context";
-import { toRepositoryRow, toWorkItemRow } from "./mappers";
+import { toRepositoryRow } from "./mappers";
 
 type CreateRepositoryInput = {
   workspaceId: string;
@@ -97,52 +96,59 @@ export async function listRepositories(workspaceId: string): Promise<RepositoryR
 export async function listRepositorySummaries(workspaceId: string): Promise<RepositorySummaryRow[]> {
   assertPersonalWorkspaceScope(workspaceId);
 
-  const repositoryRows = getDb()
-    .select()
+  const lastActivityExpression = sql<string>`max(${repositories.updatedAt}, coalesce(max(${workItems.updatedAt}), ${repositories.updatedAt}))`;
+  const rows = getDb()
+    .select({
+      repository: repositories,
+      openItemCount: sql<number>`coalesce(sum(case
+        when ${workItems.id} is null then 0
+        when (
+          (${workItems.type} = 'task' and ${workItems.status} in ('done', 'canceled', 'duplicate')) or
+          (${workItems.type} = 'bug' and ${workItems.status} in (
+            'resolved',
+            'cannot_reproduce',
+            'works_as_designed',
+            'not_planned',
+            'canceled',
+            'duplicate'
+          )) or
+          (${workItems.type} = 'idea' and ${workItems.status} in ('promoted', 'adopted', 'rejected', 'duplicate')) or
+          (${workItems.type} = 'implementation' and ${workItems.status} in ('done', 'canceled', 'duplicate')) or
+          (${workItems.type} = 'future_feature' and ${workItems.status} in (
+            'adopted',
+            'promoted',
+            'rejected',
+            'canceled',
+            'duplicate'
+          )) or
+          (${workItems.type} = 'memo' and ${workItems.status} in ('itemized', 'record_only', 'discarded', 'duplicate'))
+        ) then 0
+        else 1
+      end), 0)`,
+      memoCount: sql<number>`coalesce(sum(case when ${workItems.type} = 'memo' then 1 else 0 end), 0)`,
+      lastActivityAt: lastActivityExpression
+    })
     .from(repositories)
+    .leftJoin(
+      workItems,
+      and(
+        eq(workItems.workspaceId, workspaceId),
+        eq(workItems.repositoryId, repositories.id),
+        isNull(workItems.archivedAt),
+        isNull(workItems.deletedAt)
+      )
+    )
     .where(and(eq(repositories.workspaceId, workspaceId), isNull(repositories.archivedAt), isNull(repositories.deletedAt)))
-    .orderBy(desc(repositories.updatedAt))
-    .all();
-  const workItemRows = getDb()
-    .select()
-    .from(workItems)
-    .where(and(eq(workItems.workspaceId, workspaceId), isNull(workItems.archivedAt), isNull(workItems.deletedAt)))
+    .groupBy(repositories.id)
+    .orderBy(desc(lastActivityExpression))
     .all();
 
-  const counts = new Map<string, { openItemCount: number; memoCount: number; lastActivityAt: string | null }>();
-
-  for (const itemRow of workItemRows) {
-    const item = toWorkItemRow(itemRow);
-
-    if (!item.repository_id) {
-      continue;
-    }
-
-    const entry = counts.get(item.repository_id) ?? {
-      openItemCount: 0,
-      memoCount: 0,
-      lastActivityAt: null
-    };
-
-    if (isOpen(item)) {
-      entry.openItemCount += 1;
-    }
-
-    if (item.type === "memo") {
-      entry.memoCount += 1;
-    }
-
-    entry.lastActivityAt = latestIso(entry.lastActivityAt, item.updated_at);
-    counts.set(item.repository_id, entry);
-  }
-
-  return repositoryRows.map((repository) => {
-    const summary = counts.get(repository.id);
+  return rows.map((row) => {
     return {
-      ...toRepositoryRow(repository),
-      open_item_count: summary?.openItemCount ?? 0,
-      memo_count: summary?.memoCount ?? 0,
-      last_activity_at: latestIso(repository.updatedAt, summary?.lastActivityAt ?? null)
+      ...toRepositoryRow(row.repository),
+      open_item_count: Number(row.openItemCount),
+      memo_count: Number(row.memoCount),
+      last_activity_at: row.lastActivityAt
     };
   });
 }
@@ -187,10 +193,4 @@ export function assertActiveRepositoryInWorkspace(workspaceId: string, repositor
   if (!row) {
     throw new Error(`Active repository not found in workspace: ${repositoryId}`);
   }
-}
-
-function latestIso(a: string | null, b: string | null) {
-  if (!a) return b;
-  if (!b) return a;
-  return a > b ? a : b;
 }

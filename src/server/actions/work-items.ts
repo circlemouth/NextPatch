@@ -3,6 +3,7 @@
 import { requireLocalContext } from "@/server/auth/session";
 import { createWorkItemCommand, getWorkItemById, updateWorkItemStatusCommand } from "@/server/db/queries/work-items";
 import { defaultStatus } from "@/server/domain/work-item-defaults";
+import { titleFromBody } from "@/server/domain/work-item-title";
 import { workItemSchema } from "@/server/validation/schemas";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -13,7 +14,7 @@ export async function createWorkItem(formData: FormData) {
     repositoryId: formData.get("repositoryId") || "",
     type: formData.get("type"),
     title: formData.get("title"),
-    body: formData.get("body") || undefined,
+    body: formData.get("body") ?? "",
     priority: formData.get("priority") || "p2",
     privacyLevel: formData.get("privacyLevel") || "normal",
     isPinned: formData.get("isPinned") === "on",
@@ -24,7 +25,8 @@ export async function createWorkItem(formData: FormData) {
   }
   const parsed = parsedResult.data;
   const repositoryId = parsed.repositoryId || null;
-  const title = parsed.title?.trim() || titleFromBody(parsed.body || "");
+  const body = parsed.body.trim();
+  const title = parsed.title?.trim() || titleFromBody(body);
   const scope = repositoryId ? "repository" : parsed.type === "memo" ? "inbox" : "global";
 
   await createWorkItemCommand({
@@ -34,7 +36,7 @@ export async function createWorkItem(formData: FormData) {
     scope,
     type: parsed.type,
     title,
-    body: parsed.body || null,
+    body,
     status: defaultStatus(parsed.type),
     priority: parsed.priority,
     sourceType: "manual",
@@ -69,8 +71,4 @@ export async function updateWorkItemStatus(formData: FormData) {
   if (item?.repository_id) {
     revalidatePath(`/repositories/${item.repository_id}`);
   }
-}
-
-function titleFromBody(value: string) {
-  return value.split(/\r?\n/).find(Boolean)?.slice(0, 80) || "Untitled memo";
 }

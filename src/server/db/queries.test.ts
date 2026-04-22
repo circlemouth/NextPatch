@@ -379,6 +379,49 @@ describe("SQLite repository queries", () => {
       })
     );
   });
+
+  it("sorts repository summaries by latest work item activity", async () => {
+    const ctx = setup();
+    const quietRepositoryId = await createRepositoryCommand({
+      workspaceId: ctx.workspaceId,
+      userId: ctx.userId,
+      provider: "manual",
+      name: "Quiet repo",
+      productionStatus: "development",
+      criticality: "medium"
+    });
+    const activeRepositoryId = await createRepositoryCommand({
+      workspaceId: ctx.workspaceId,
+      userId: ctx.userId,
+      provider: "manual",
+      name: "Active repo",
+      productionStatus: "development",
+      criticality: "medium"
+    });
+
+    getSqlite().prepare("update repositories set updated_at = ? where id = ?").run("2026-04-22T00:00:00.000Z", quietRepositoryId);
+    getSqlite().prepare("update repositories set updated_at = ? where id = ?").run("2026-04-20T00:00:00.000Z", activeRepositoryId);
+
+    const activeItemId = await createWorkItemCommand({
+      workspaceId: ctx.workspaceId,
+      userId: ctx.userId,
+      repositoryId: activeRepositoryId,
+      scope: "repository",
+      type: "task",
+      title: "Newest work item",
+      status: "todo",
+      priority: "p2",
+      sourceType: "manual",
+      privacyLevel: "normal",
+      isPinned: false
+    });
+    getSqlite().prepare("update work_items set updated_at = ? where id = ?").run("2026-04-23T00:00:00.000Z", activeItemId);
+
+    const summaries = await listRepositorySummaries(ctx.workspaceId);
+
+    expect(summaries.map((item) => item.id)).toEqual([activeRepositoryId, quietRepositoryId]);
+    expect(summaries[0]).toEqual(expect.objectContaining({ id: activeRepositoryId, last_activity_at: "2026-04-23T00:00:00.000Z" }));
+  });
 });
 
 describe("SQLite work item and classification queries", () => {

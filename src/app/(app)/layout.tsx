@@ -25,14 +25,14 @@ export default async function AppLayout({
 
             <details className="topbar-menu">
               <summary className="button button--secondary topbar-menu__summary">設定メニュー</summary>
-              <div className="topbar-menu__panel" role="menu" aria-label="設定メニュー">
-                <Link className="topbar-menu__link" href="/settings" role="menuitem">
+              <nav className="topbar-menu__panel" aria-label="設定メニュー">
+                <Link className="topbar-menu__link" href="/settings">
                   設定
                 </Link>
-                <Link className="topbar-menu__link" href="/settings/data" role="menuitem">
+                <Link className="topbar-menu__link" href="/settings/data">
                   データ管理
                 </Link>
-                <Link className="topbar-menu__link" href="/settings/system" role="menuitem">
+                <Link className="topbar-menu__link" href="/settings/system">
                   システム状態
                 </Link>
                 <form action={logoutAction} className="topbar-menu__form">
@@ -40,7 +40,7 @@ export default async function AppLayout({
                     ログアウト
                   </button>
                 </form>
-              </div>
+              </nav>
             </details>
           </header>
           {children}

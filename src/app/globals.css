@@ -158,6 +158,10 @@ select {
   cursor: pointer;
 }
 
+.topbar-menu__link:visited {
+  color: var(--color-text);
+}
+
 .topbar-menu__link:hover,
 .topbar-menu__button:hover,
 .topbar-menu__link:focus-visible,
@@ -361,8 +365,17 @@ h3 {
   background: var(--color-primary-hover);
 }
 
+.button:visited {
+  color: #ffffff;
+}
+
 .button--secondary {
   background: #ffffff;
+  color: var(--color-primary);
+}
+
+.button--secondary:visited,
+.button--tertiary:visited {
   color: var(--color-primary);
 }
 
@@ -520,6 +533,27 @@ th {
   gap: var(--space-2);
 }
 
+.repository-detail__current-focus {
+  margin: 0;
+  padding: var(--space-2);
+  border-radius: var(--radius-md);
+  background: var(--color-info-bg);
+  font-size: 18px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.repository-detail__workflow {
+  display: grid;
+  grid-template-columns: minmax(280px, 3fr) minmax(0, 5fr);
+  gap: var(--space-3);
+  align-items: start;
+}
+
+.repository-detail__workflow > .repository-detail__focus {
+  grid-column: 1 / -1;
+}
+
 .repository-detail__focus-form {
   display: grid;
   gap: var(--space-2);
@@ -617,6 +651,10 @@ th {
   }
 
   .grid-8-4 {
+    grid-template-columns: 1fr;
+  }
+
+  .repository-detail__workflow {
     grid-template-columns: 1fr;
   }
 

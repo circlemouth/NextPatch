@@ -4,6 +4,7 @@ import { requireLocalContext } from "@/server/auth/session";
 import { listRepositorySummaries } from "@/server/db/queries/repositories";
 import { listWorkItemsForRepository } from "@/server/db/queries/work-items";
 import { getWorkItemStatusActions } from "@/server/domain/status";
+import { formatWorkItemStatus, formatWorkItemType } from "@/server/domain/work-item-labels";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
@@ -54,18 +55,101 @@ export default async function RepositoryDetailPage({ params }: RepositoryDetailP
         </div>
       </header>
 
-      <div className="grid-8-4">
-        <section className="panel" aria-labelledby="memo-task-heading">
+      <div className="repository-detail__workflow">
+        <section className="panel repository-detail__focus" aria-labelledby="focus-heading">
+          <div className="panel__header">
+            <div>
+              <p className="eyebrow">Focus</p>
+              <h2 id="focus-heading">現在の焦点</h2>
+            </div>
+            <Link className="button button--secondary" href="/repositories">
+              一覧へ戻る
+            </Link>
+          </div>
+          {repository.current_focus ? (
+            <p className="repository-detail__current-focus">{repository.current_focus}</p>
+          ) : (
+            <p className="banner">現在の焦点は未設定です。下のフォームに、次に見るべきことを 1 つだけ書いておくと迷いにくくなります。</p>
+          )}
+          <form action={updateRepositoryFocus} className="form-stack">
+            <input type="hidden" name="id" value={repository.id} />
+            <div className="field">
+              <label htmlFor="currentFocus">
+                現在の焦点<span className="required">※任意</span>
+              </label>
+              <p className="support">今の優先課題を短く書きます。</p>
+              <textarea id="currentFocus" name="currentFocus" placeholder={repository.current_focus ? "変更後の焦点を入力" : ""} />
+            </div>
+            <button className="button button--secondary" type="submit">
+              保存
+            </button>
+          </form>
+        </section>
+
+        <section className="panel" aria-labelledby="quick-write-heading">
+          <div className="panel__header">
+            <div>
+              <p className="eyebrow">Quick write</p>
+              <h2 id="quick-write-heading">すぐ書く</h2>
+            </div>
+          </div>
+          <form action={createWorkItem} className="form-stack">
+            <input type="hidden" name="repositoryId" value={repository.id} />
+            <div className="field">
+              <label htmlFor="quickType">
+                種類<span className="required">※必須</span>
+              </label>
+              <p className="support">メモ / タスク / バグ から選びます。</p>
+              <select id="quickType" name="type" defaultValue="memo">
+                <option value="memo">メモ</option>
+                <option value="task">タスク</option>
+                <option value="bug">バグ</option>
+              </select>
+            </div>
+            <div className="field">
+              <label htmlFor="quickBody">
+                内容<span className="required">※必須</span>
+              </label>
+              <p className="support">まず内容を書きます。タイトル未入力なら内容の先頭行から作ります。</p>
+              <textarea id="quickBody" name="body" required />
+            </div>
+            <div className="field">
+              <label htmlFor="quickTitle">
+                タイトル<span className="required">※任意</span>
+              </label>
+              <p className="support">一覧で短く見分けたい場合だけ入力します。</p>
+              <input id="quickTitle" name="title" />
+            </div>
+            <div className="field field--subtle">
+              <label htmlFor="priority">
+                優先度<span className="required">※必須</span>
+              </label>
+              <p className="support">通常は p2 のままで問題ありません。</p>
+              <select id="priority" name="priority" defaultValue="p2">
+                <option value="p0">p0</option>
+                <option value="p1">p1</option>
+                <option value="p2">p2</option>
+                <option value="p3">p3</option>
+                <option value="p4">p4</option>
+              </select>
+            </div>
+            <button className="button" type="submit">
+              保存
+            </button>
+          </form>
+        </section>
+
+        <section className="panel repository-detail__list" aria-labelledby="memo-task-heading">
           <div className="panel__header">
             <div>
               <p className="eyebrow">Notes and tasks</p>
-              <h2 id="memo-task-heading">メモ・タスク</h2>
+              <h2 id="memo-task-heading">メモ・タスク一覧</h2>
             </div>
             <span className="support">{workItems.length} 件</span>
           </div>
 
           {workItems.length === 0 ? (
-            <p className="support">まだメモ・タスクはありません。右側の「すぐ書く」から追加してください。</p>
+            <p className="support">まだメモ・タスクはありません。上の「すぐ書く」から追加してください。</p>
           ) : (
             <div className="card-list repository-detail__items">
               {workItems.map((item) => {
@@ -81,8 +165,8 @@ export default async function RepositoryDetailPage({ params }: RepositoryDetailP
                         {item.body ? <p className="support">{item.body.slice(0, 240)}</p> : null}
                       </div>
                       <div className="meta-row">
-                        <span className="badge">{formatType(item.type)}</span>
-                        <span className="badge">{formatStatus(item.status)}</span>
+                        <span className="badge">{formatWorkItemType(item.type)}</span>
+                        <span className="badge">{formatWorkItemStatus(item.status)}</span>
                         <span className="badge">{item.priority}</span>
                       </div>
                     </div>
@@ -111,86 +195,6 @@ export default async function RepositoryDetailPage({ params }: RepositoryDetailP
             </div>
           )}
         </section>
-
-        <div className="section-stack">
-          <section className="panel repository-detail__focus" aria-labelledby="focus-heading">
-            <div className="panel__header">
-              <div>
-                <p className="eyebrow">Focus</p>
-                <h2 id="focus-heading">現在の焦点</h2>
-              </div>
-              <Link className="button button--secondary" href="/repositories">
-                一覧へ戻る
-              </Link>
-            </div>
-            <form action={updateRepositoryFocus} className="form-stack">
-              <input type="hidden" name="id" value={repository.id} />
-              <div className="field">
-                <label htmlFor="currentFocus">
-                  現在の焦点<span className="required">※任意</span>
-                </label>
-                <p className="support">今の優先課題を短く書きます。</p>
-                <textarea id="currentFocus" name="currentFocus" defaultValue={repository.current_focus ?? ""} />
-              </div>
-              <button className="button button--secondary" type="submit">
-                保存
-              </button>
-            </form>
-          </section>
-
-          <section className="panel" aria-labelledby="quick-write-heading">
-            <div className="panel__header">
-              <div>
-                <p className="eyebrow">Quick write</p>
-                <h2 id="quick-write-heading">すぐ書く</h2>
-              </div>
-            </div>
-            <form action={createWorkItem} className="form-stack">
-              <input type="hidden" name="repositoryId" value={repository.id} />
-              <div className="field">
-                <label htmlFor="quickType">
-                  種類<span className="required">※必須</span>
-                </label>
-                <p className="support">メモ / タスク / バグ から選びます。</p>
-                <select id="quickType" name="type" defaultValue="memo">
-                  <option value="memo">メモ</option>
-                  <option value="task">タスク</option>
-                  <option value="bug">バグ</option>
-                </select>
-              </div>
-              <div className="field">
-                <label htmlFor="quickBody">
-                  内容<span className="required">※必須</span>
-                </label>
-                <p className="support">まず内容を書きます。タイトル未入力なら内容の先頭行から作ります。</p>
-                <textarea id="quickBody" name="body" required />
-              </div>
-              <div className="field">
-                <label htmlFor="quickTitle">
-                  タイトル<span className="required">※任意</span>
-                </label>
-                <p className="support">一覧で短く見分けたい場合だけ入力します。</p>
-                <input id="quickTitle" name="title" />
-              </div>
-              <div className="field field--subtle">
-                <label htmlFor="priority">
-                  優先度<span className="required">※必須</span>
-                </label>
-                <p className="support">通常は p2 のままで問題ありません。</p>
-                <select id="priority" name="priority" defaultValue="p2">
-                  <option value="p0">p0</option>
-                  <option value="p1">p1</option>
-                  <option value="p2">p2</option>
-                  <option value="p3">p3</option>
-                  <option value="p4">p4</option>
-                </select>
-              </div>
-              <button className="button" type="submit">
-                保存
-              </button>
-            </form>
-          </section>
-        </div>
       </div>
     </main>
   );
@@ -206,33 +210,4 @@ function formatDateTime(value: string | null) {
     timeStyle: "short",
     timeZone: "Asia/Tokyo"
   }).format(new Date(value));
-}
-
-function formatType(type: string) {
-  const labels: Record<string, string> = {
-    memo: "メモ",
-    task: "タスク",
-    bug: "バグ",
-    idea: "アイデア",
-    implementation: "実装メモ",
-    future_feature: "将来機能"
-  };
-
-  return labels[type] ?? type;
-}
-
-function formatStatus(status: string) {
-  const labels: Record<string, string> = {
-    unreviewed: "未確認",
-    todo: "未着手",
-    doing: "進行中",
-    done: "完了",
-    unconfirmed: "未確認",
-    confirmed: "確認済み",
-    fixed_waiting: "修正済み",
-    resolved: "解決済み",
-    itemized: "項目化済み"
-  };
-
-  return labels[status] ?? status;
 }

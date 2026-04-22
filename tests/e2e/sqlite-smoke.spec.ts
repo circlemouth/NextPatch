@@ -67,7 +67,7 @@ test("SQLite local smoke: repositories-first flows, quick write, menu settings, 
   await guards.assertHealthy("task status update");
 
   await openTopbarMenu(page);
-  await page.getByRole("menuitem", { name: "データ管理" }).click();
+  await page.getByRole("link", { name: "データ管理" }).click();
   await expect(page).toHaveURL(/\/settings\/data$/);
   await expect(page.getByRole("link", { name: "JSON export" })).toHaveAttribute("href", "/api/export/json");
   await expect(page.getByRole("link", { name: "Markdown export" })).toHaveAttribute("href", "/api/export/markdown");

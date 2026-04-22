@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { titleFromBody } from "@/server/domain/work-item-title";
 import { classifyMemoSchema, quickCaptureSchema, repositorySchema, workItemSchema } from "./schemas";
 
 describe("repositorySchema", () => {
@@ -15,7 +16,7 @@ describe("repositorySchema", () => {
 
 describe("workItemSchema", () => {
   it("accepts nullable repositoryId and applies defaults", () => {
-    const result = workItemSchema.parse({ repositoryId: "", type: "task", title: "Fix bug" });
+    const result = workItemSchema.parse({ repositoryId: "", type: "task", title: "Fix bug", body: "Fix bug details" });
     expect(result.repositoryId).toBe("");
     expect(result.priority).toBe("p2");
     expect(result.privacyLevel).toBe("normal");
@@ -25,6 +26,11 @@ describe("workItemSchema", () => {
     const result = workItemSchema.parse({ type: "memo", body: "First line" });
     expect(result.title).toBeUndefined();
     expect(result.body).toBe("First line");
+  });
+
+  it("rejects empty content for quick write creation flows", () => {
+    expect(() => workItemSchema.parse({ type: "memo", title: "", body: "   " })).toThrow("＊内容を入力してください。");
+    expect(() => workItemSchema.parse({ type: "memo", title: "" })).toThrow("＊内容を入力してください。");
   });
 
   it("rejects invalid privacy levels", () => {
@@ -79,10 +85,3 @@ describe("classifyMemoSchema", () => {
   });
 });
 
-function titleFromBody(value: string) {
-  return value
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .find(Boolean)
-    ?.slice(0, 80) || "Untitled memo";
-}

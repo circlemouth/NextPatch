@@ -1,5 +1,10 @@
 import { z } from "zod";
 
+const requiredBodySchema = z.preprocess(
+  (value) => (value == null ? "" : value),
+  z.string().trim().min(1, "＊内容を入力してください。")
+);
+
 export const repositorySchema = z.object({
   name: z.string().trim().min(1, "＊リポジトリ名を入力してください。"),
   htmlUrl: z.string().trim().optional(),
@@ -13,7 +18,7 @@ export const workItemSchema = z.object({
   repositoryId: z.string().uuid().optional().or(z.literal("")),
   type: z.enum(["task", "bug", "idea", "implementation", "future_feature", "memo"]),
   title: z.string().trim().optional(),
-  body: z.string().trim().optional(),
+  body: requiredBodySchema,
   priority: z.enum(["p0", "p1", "p2", "p3", "p4"]).default("p2"),
   privacyLevel: z.enum(["normal", "confidential", "secret", "no_ai"]).default("normal"),
   isPinned: z.boolean().default(false),
@@ -24,7 +29,7 @@ export const quickCaptureSchema = z.object({
   repositoryId: z.string().uuid().optional().or(z.literal("")),
   type: z.enum(["task", "bug", "idea", "implementation", "future_feature", "memo", "auto"]).default("auto"),
   title: z.string().trim().optional(),
-  body: z.string().trim().min(1, "Body is required."),
+  body: requiredBodySchema,
   privacyLevel: z.enum(["normal", "confidential", "secret", "no_ai"]).default("normal"),
   isPinned: z.boolean().default(false),
   sourceType: z.enum(["manual", "chatgpt"]).default("manual")
