@@ -30,7 +30,14 @@ import { LOCAL_USER_ID, PERSONAL_WORKSPACE_ID } from "@/server/auth/session";
 import { closeDatabaseConnection, getSqlite } from "@/server/db/client";
 import { classifyMemoCommand, quickCaptureCommand } from "@/server/db/queries/classification";
 import { listDashboardWorkItems } from "@/server/db/queries/dashboard";
-import { archiveRepositoryCommand, createRepositoryCommand, getRepositoryById, listRepositories } from "@/server/db/queries/repositories";
+import {
+  archiveRepositoryCommand,
+  createRepositoryCommand,
+  getRepositoryById,
+  listRepositories,
+  listRepositorySummaries,
+  updateRepositoryFocusCommand
+} from "@/server/db/queries/repositories";
 import {
   createWorkItemCommand,
   getWorkItemById,
@@ -130,6 +137,92 @@ describe("SQLite repository queries", () => {
     await archiveRepositoryCommand(ctx.workspaceId, id);
 
     expect(await listRepositories(ctx.workspaceId)).toEqual([]);
+  });
+
+  it("updates repository focus within the workspace", async () => {
+    const ctx = setup();
+    const id = await createRepositoryCommand({
+      workspaceId: ctx.workspaceId,
+      userId: ctx.userId,
+      provider: "manual",
+      name: "Focus repo",
+      productionStatus: "development",
+      criticality: "medium"
+    });
+
+    await updateRepositoryFocusCommand(ctx.workspaceId, id, "Investigate sync lag");
+
+    expect(await getRepositoryById(ctx.workspaceId, id)).toEqual(
+      expect.objectContaining({ id, current_focus: "Investigate sync lag" })
+    );
+  });
+
+  it("builds repository summaries from active items only", async () => {
+    const ctx = setup();
+    const repositoryId = await createRepositoryCommand({
+      workspaceId: ctx.workspaceId,
+      userId: ctx.userId,
+      provider: "manual",
+      name: "Summary repo",
+      productionStatus: "active_production",
+      criticality: "high"
+    });
+
+    const activeTaskId = await createWorkItemCommand({
+      workspaceId: ctx.workspaceId,
+      userId: ctx.userId,
+      repositoryId,
+      scope: "repository",
+      type: "task",
+      title: "Open task",
+      status: "todo",
+      priority: "p2",
+      sourceType: "manual",
+      privacyLevel: "normal",
+      isPinned: false
+    });
+    await createWorkItemCommand({
+      workspaceId: ctx.workspaceId,
+      userId: ctx.userId,
+      repositoryId,
+      scope: "repository",
+      type: "memo",
+      title: "Repo memo",
+      status: "unreviewed",
+      priority: "p2",
+      sourceType: "manual",
+      privacyLevel: "normal",
+      isPinned: false
+    });
+    const archivedTaskId = await createWorkItemCommand({
+      workspaceId: ctx.workspaceId,
+      userId: ctx.userId,
+      repositoryId,
+      scope: "repository",
+      type: "task",
+      title: "Archived task",
+      status: "todo",
+      priority: "p2",
+      sourceType: "manual",
+      privacyLevel: "normal",
+      isPinned: false
+    });
+    const archivedAt = "2026-04-21T00:00:00.000Z";
+    getSqlite().prepare("update work_items set archived_at = ? where id = ?").run(archivedAt, archivedTaskId);
+
+    const summaries = await listRepositorySummaries(ctx.workspaceId);
+    const summary = summaries.find((row) => row.id === repositoryId);
+
+    expect(summary).toEqual(
+      expect.objectContaining({
+        id: repositoryId,
+        open_item_count: 2,
+        memo_count: 1,
+        last_activity_at: expect.any(String)
+      })
+    );
+    expect(summary?.last_activity_at).toBeTruthy();
+    expect(activeTaskId).toBeTruthy();
   });
 
   it("gets only active repositories by id", async () => {

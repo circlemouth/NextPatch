@@ -1,5 +1,6 @@
 import { requireLocalContext } from "@/server/auth/session";
 import { getWorkItemById } from "@/server/db/queries/work-items";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 
 type WorkItemDetailPageProps = {
@@ -18,13 +19,23 @@ export default async function WorkItemDetailPage({ params }: WorkItemDetailPageP
   return (
     <main className="page">
       <article className="panel">
-        <p className="eyebrow">{item.type}</p>
-        <h1>{item.title}</h1>
+        <div className="panel__header">
+          <div>
+            <p className="eyebrow">{item.type}</p>
+            <h1>{item.title}</h1>
+          </div>
+          {item.repository_id ? (
+            <Link className="button button--secondary" href={`/repositories/${item.repository_id}`}>
+              リポジトリ詳細へ
+            </Link>
+          ) : null}
+        </div>
         <div className="meta-row">
           <span className="badge">{item.status}</span>
           <span className="badge">{item.priority}</span>
           <span className="badge">{item.scope}</span>
         </div>
+        {item.repository_id ? <p className="support">Repository: {item.repository_id}</p> : null}
         {item.body ? <p>{item.body}</p> : <p className="support">本文はありません。</p>}
       </article>
     </main>

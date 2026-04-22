@@ -29,6 +29,12 @@ export type RepositoryRow = {
   deleted_at: string | null;
 };
 
+export type RepositorySummaryRow = RepositoryRow & {
+  open_item_count: number;
+  memo_count: number;
+  last_activity_at: string | null;
+};
+
 export type WorkItemRow = {
   id: string;
   workspace_id: string;

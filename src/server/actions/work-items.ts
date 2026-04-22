@@ -1,7 +1,7 @@
 "use server";
 
 import { requireLocalContext } from "@/server/auth/session";
-import { createWorkItemCommand, updateWorkItemStatusCommand } from "@/server/db/queries/work-items";
+import { createWorkItemCommand, getWorkItemById, updateWorkItemStatusCommand } from "@/server/db/queries/work-items";
 import { defaultStatus } from "@/server/domain/work-item-defaults";
 import { workItemSchema } from "@/server/validation/schemas";
 import { revalidatePath } from "next/cache";
@@ -24,15 +24,16 @@ export async function createWorkItem(formData: FormData) {
   }
   const parsed = parsedResult.data;
   const repositoryId = parsed.repositoryId || null;
+  const title = parsed.title?.trim() || titleFromBody(parsed.body || "");
   const scope = repositoryId ? "repository" : parsed.type === "memo" ? "inbox" : "global";
 
-  const id = await createWorkItemCommand({
+  await createWorkItemCommand({
     workspaceId: workspace.id,
     userId: user.id,
     repositoryId,
     scope,
     type: parsed.type,
-    title: parsed.title,
+    title,
     body: parsed.body || null,
     status: defaultStatus(parsed.type),
     priority: parsed.priority,
@@ -44,7 +45,13 @@ export async function createWorkItem(formData: FormData) {
   });
 
   revalidatePath("/work-items");
-  redirect(`/work-items/${id}`);
+  revalidatePath("/repositories");
+  if (repositoryId) {
+    revalidatePath(`/repositories/${repositoryId}`);
+    redirect(`/repositories/${repositoryId}`);
+  }
+
+  redirect("/repositories");
 }
 
 export async function updateWorkItemStatus(formData: FormData) {
@@ -54,8 +61,16 @@ export async function updateWorkItemStatus(formData: FormData) {
   if (!id || !status) {
     throw new Error("Work item status update requires id and status");
   }
+  const item = await getWorkItemById(workspace.id, id);
   await updateWorkItemStatusCommand(workspace.id, user.id, id, status);
 
-  revalidatePath("/dashboard");
+  revalidatePath("/repositories");
   revalidatePath("/work-items");
+  if (item?.repository_id) {
+    revalidatePath(`/repositories/${item.repository_id}`);
+  }
+}
+
+function titleFromBody(value: string) {
+  return value.split(/\r?\n/).find(Boolean)?.slice(0, 80) || "Untitled memo";
 }

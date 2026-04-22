@@ -7,16 +7,20 @@ describe("sanitizeNextPath", () => {
   });
 
   it("rejects normalized protocol-relative paths", () => {
-    expect(sanitizeNextPath("/..//evil.example")).toBe("/dashboard");
-    expect(sanitizeNextPath("/%2e%2e//evil.example")).toBe("/dashboard");
+    expect(sanitizeNextPath("/..//evil.example")).toBe("/repositories");
+    expect(sanitizeNextPath("/%2e%2e//evil.example")).toBe("/repositories");
   });
 
   it("rejects external URLs", () => {
-    expect(sanitizeNextPath("https://evil.example")).toBe("/dashboard");
+    expect(sanitizeNextPath("https://evil.example")).toBe("/repositories");
   });
 
   it("rejects protocol-relative URLs", () => {
-    expect(sanitizeNextPath("//evil.example")).toBe("/dashboard");
+    expect(sanitizeNextPath("//evil.example")).toBe("/repositories");
+  });
+
+  it("falls back to repositories when missing", () => {
+    expect(sanitizeNextPath(undefined)).toBe("/repositories");
   });
 });
 

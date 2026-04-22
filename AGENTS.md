@@ -19,7 +19,7 @@
 - SQLite 移行の正本は `drizzle/*.sql` の手書き SQL です。`db:generate` は使わないこと。
 - `src/server/db/schema.ts` は Drizzle の型付け用で、制約の正本ではありません。
 - `data/`、`exports/`、`backups/` は Git 管理から外す前提です。DB バックアップは JSON エクスポートか SQLite 安全な方法を優先します。
-- `/login` はログイン機能ではなく、`/dashboard` への安全なリダイレクト用です。
+- `/login` はログイン機能ではなく、`/repositories` への安全なリダイレクト用です。
 - 外部公開を前提にした変更をする場合は、先に HTTPS と明示的なアクセス制御を追加してください。
 
 ## Workspace Cleanup Rule

@@ -1,9 +1,11 @@
 import { and, desc, eq, isNull } from "drizzle-orm";
 import { getDb } from "@/server/db/client";
 import { repositories } from "@/server/db/schema";
-import type { Criticality, ProductionStatus, RepositoryRow } from "@/server/types";
+import { isOpen } from "@/server/domain/status";
+import type { Criticality, ProductionStatus, RepositoryRow, RepositorySummaryRow } from "@/server/types";
 import { assertPersonalWorkspaceScope } from "./context";
 import { toRepositoryRow } from "./mappers";
+import { listWorkItems } from "./work-items";
 
 type CreateRepositoryInput = {
   workspaceId: string;
@@ -52,6 +54,23 @@ export async function createRepositoryCommand(input: CreateRepositoryInput) {
   return id;
 }
 
+export async function updateRepositoryFocusCommand(workspaceId: string, id: string, currentFocus: string | null) {
+  assertPersonalWorkspaceScope(workspaceId);
+
+  const now = new Date().toISOString();
+  const result = getDb()
+    .update(repositories)
+    .set({ currentFocus, updatedAt: now })
+    .where(
+      and(eq(repositories.workspaceId, workspaceId), eq(repositories.id, id), isNull(repositories.archivedAt), isNull(repositories.deletedAt))
+    )
+    .run();
+
+  if (result.changes !== 1) {
+    throw new Error(`Repository not found: ${id}`);
+  }
+}
+
 export async function archiveRepositoryCommand(workspaceId: string, id: string) {
   assertPersonalWorkspaceScope(workspaceId);
 
@@ -74,6 +93,55 @@ export async function listRepositories(workspaceId: string): Promise<RepositoryR
     .all();
 
   return rows.map(toRepositoryRow);
+}
+
+export async function listRepositorySummaries(workspaceId: string): Promise<RepositorySummaryRow[]> {
+  assertPersonalWorkspaceScope(workspaceId);
+
+  const [repositoriesList, workItems] = await Promise.all([listRepositories(workspaceId), listWorkItems(workspaceId)]);
+  const summaries = new Map<string, RepositorySummaryRow>();
+
+  for (const repository of repositoriesList) {
+    summaries.set(repository.id, {
+      ...repository,
+      open_item_count: 0,
+      memo_count: 0,
+      last_activity_at: repository.updated_at
+    });
+  }
+
+  for (const item of workItems) {
+    if (!item.repository_id) {
+      continue;
+    }
+
+    const summary = summaries.get(item.repository_id);
+    if (!summary) {
+      continue;
+    }
+
+    if (isOpen(item)) {
+      summary.open_item_count += 1;
+    }
+
+    if (item.type === "memo") {
+      summary.memo_count += 1;
+    }
+
+    if (!summary.last_activity_at || item.updated_at > summary.last_activity_at) {
+      summary.last_activity_at = item.updated_at;
+    }
+  }
+
+  return repositoriesList.map(
+    (repository) =>
+      summaries.get(repository.id) ?? {
+        ...repository,
+        open_item_count: 0,
+        memo_count: 0,
+        last_activity_at: repository.updated_at
+      }
+  );
 }
 
 export async function getRepositoryById(workspaceId: string, id: string): Promise<RepositoryRow | null> {
