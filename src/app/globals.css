@@ -286,6 +286,11 @@ h3 {
   gap: var(--space-1);
 }
 
+.work-item-body {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 .repository-card {
   gap: var(--space-2);
 }

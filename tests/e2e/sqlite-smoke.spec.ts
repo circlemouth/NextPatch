@@ -42,14 +42,21 @@ test("SQLite local smoke: repositories-first flows, quick write, menu settings, 
   await page.getByRole("button", { name: "保存" }).click();
   await expect(page).toHaveURL(/\/repositories\/[^/]+$/);
   await expect(page.getByRole("heading", { name: `QA Repo ${suffix}` })).toBeVisible();
-  await expect(page.getByText(`Initial focus ${suffix}`)).toBeVisible();
+  await expect(page.locator(".repository-detail__current-focus", { hasText: `Initial focus ${suffix}` })).toBeVisible();
   await guards.assertHealthy("repository create");
 
   await page.getByRole("textbox", { name: /現在の焦点/ }).fill(`Updated focus ${suffix}`);
   await page.getByRole("button", { name: "保存" }).first().click();
   await expect(page).toHaveURL(/\/repositories\/[^/]+$/);
-  await expect(page.getByText(`Updated focus ${suffix}`)).toBeVisible();
+  await expect(page.locator(".repository-detail__current-focus", { hasText: `Updated focus ${suffix}` })).toBeVisible();
   await guards.assertHealthy("repository focus update");
+
+  await page.getByLabel(/種類/).selectOption("task");
+  await page.getByLabel(/内容/).fill("   ");
+  await page.getByRole("button", { name: "保存" }).last().click();
+  await expect(page.locator(".error-text", { hasText: "＊内容を入力してください。" })).toBeVisible();
+  await expect(page.getByLabel(/内容/)).toHaveAttribute("aria-describedby", "quick-write-body-error");
+  await guards.assertHealthy("quick write validation");
 
   await page.getByLabel(/種類/).selectOption("task");
   await page.getByLabel(/内容/).fill(`Quick write title ${suffix}\nSecond line for the body.`);

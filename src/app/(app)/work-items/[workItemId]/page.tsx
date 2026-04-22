@@ -38,7 +38,7 @@ export default async function WorkItemDetailPage({ params }: WorkItemDetailPageP
           <span className="badge">{formatWorkItemScope(item.scope)}</span>
         </div>
         {item.repository_id ? <p className="support">リポジトリ: {item.repositories?.name ?? "不明なリポジトリ"}</p> : null}
-        {item.body ? <p>{item.body}</p> : <p className="support">本文はありません。</p>}
+        {item.body ? <div className="work-item-body">{item.body}</div> : <p className="support">本文はありません。</p>}
       </article>
     </main>
   );

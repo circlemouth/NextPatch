@@ -1,5 +1,5 @@
 import { updateRepositoryFocus } from "@/server/actions/repositories";
-import { createWorkItem, updateWorkItemStatus } from "@/server/actions/work-items";
+import { updateWorkItemStatus } from "@/server/actions/work-items";
 import { requireLocalContext } from "@/server/auth/session";
 import { listRepositorySummaries } from "@/server/db/queries/repositories";
 import { listWorkItemsForRepository } from "@/server/db/queries/work-items";
@@ -7,6 +7,7 @@ import { getWorkItemStatusActions } from "@/server/domain/status";
 import { formatWorkItemStatus, formatWorkItemType } from "@/server/domain/work-item-labels";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { QuickWriteForm } from "./quick-write-form";
 
 type RepositoryDetailPageProps = {
   params: Promise<{ repositoryId: string }>;
@@ -78,7 +79,7 @@ export default async function RepositoryDetailPage({ params }: RepositoryDetailP
                 現在の焦点<span className="required">※任意</span>
               </label>
               <p className="support">今の優先課題を短く書きます。</p>
-              <textarea id="currentFocus" name="currentFocus" placeholder={repository.current_focus ? "変更後の焦点を入力" : ""} />
+              <textarea id="currentFocus" name="currentFocus" defaultValue={repository.current_focus ?? ""} />
             </div>
             <button className="button button--secondary" type="submit">
               保存
@@ -93,50 +94,7 @@ export default async function RepositoryDetailPage({ params }: RepositoryDetailP
               <h2 id="quick-write-heading">すぐ書く</h2>
             </div>
           </div>
-          <form action={createWorkItem} className="form-stack">
-            <input type="hidden" name="repositoryId" value={repository.id} />
-            <div className="field">
-              <label htmlFor="quickType">
-                種類<span className="required">※必須</span>
-              </label>
-              <p className="support">メモ / タスク / バグ から選びます。</p>
-              <select id="quickType" name="type" defaultValue="memo">
-                <option value="memo">メモ</option>
-                <option value="task">タスク</option>
-                <option value="bug">バグ</option>
-              </select>
-            </div>
-            <div className="field">
-              <label htmlFor="quickBody">
-                内容<span className="required">※必須</span>
-              </label>
-              <p className="support">まず内容を書きます。タイトル未入力なら内容の先頭行から作ります。</p>
-              <textarea id="quickBody" name="body" required />
-            </div>
-            <div className="field">
-              <label htmlFor="quickTitle">
-                タイトル<span className="required">※任意</span>
-              </label>
-              <p className="support">一覧で短く見分けたい場合だけ入力します。</p>
-              <input id="quickTitle" name="title" />
-            </div>
-            <div className="field field--subtle">
-              <label htmlFor="priority">
-                優先度<span className="required">※必須</span>
-              </label>
-              <p className="support">通常は p2 のままで問題ありません。</p>
-              <select id="priority" name="priority" defaultValue="p2">
-                <option value="p0">p0</option>
-                <option value="p1">p1</option>
-                <option value="p2">p2</option>
-                <option value="p3">p3</option>
-                <option value="p4">p4</option>
-              </select>
-            </div>
-            <button className="button" type="submit">
-              保存
-            </button>
-          </form>
+          <QuickWriteForm repositoryId={repository.id} />
         </section>
 
         <section className="panel repository-detail__list" aria-labelledby="memo-task-heading">

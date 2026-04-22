@@ -38,6 +38,7 @@ describe("workItemSchema", () => {
       workItemSchema.parse({
         type: "bug",
         title: "Crash",
+        body: "Crash details",
         privacyLevel: "private"
       })
     ).toThrow();
@@ -84,4 +85,3 @@ describe("classifyMemoSchema", () => {
     ).toThrow();
   });
 });
-

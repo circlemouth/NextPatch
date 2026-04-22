@@ -7,23 +7,32 @@ import { titleFromBody } from "@/server/domain/work-item-title";
 import { workItemSchema } from "@/server/validation/schemas";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import type { z } from "zod";
+
+export type WorkItemFormState = {
+  error: string | null;
+};
+
+type WorkItemFormInput = z.infer<typeof workItemSchema>;
 
 export async function createWorkItem(formData: FormData) {
-  const { user, workspace } = await requireLocalContext();
-  const parsedResult = workItemSchema.safeParse({
-    repositoryId: formData.get("repositoryId") || "",
-    type: formData.get("type"),
-    title: formData.get("title"),
-    body: formData.get("body") ?? "",
-    priority: formData.get("priority") || "p2",
-    privacyLevel: formData.get("privacyLevel") || "normal",
-    isPinned: formData.get("isPinned") === "on",
-    externalUrl: formData.get("externalUrl") || undefined
-  });
+  const parsed = workItemSchema.parse(workItemFormDataToInput(formData));
+  await createWorkItemFromParsed(parsed);
+}
+
+export async function createWorkItemWithState(_previousState: WorkItemFormState, formData: FormData): Promise<WorkItemFormState> {
+  const parsedResult = workItemSchema.safeParse(workItemFormDataToInput(formData));
   if (!parsedResult.success) {
-    throw new Error(parsedResult.error.issues.map((issue) => issue.message).join(" "));
+    return { error: parsedResult.error.issues.map((issue) => issue.message).join(" ") };
   }
-  const parsed = parsedResult.data;
+
+  await createWorkItemFromParsed(parsedResult.data);
+  return { error: null };
+}
+
+async function createWorkItemFromParsed(parsed: WorkItemFormInput) {
+  const { user, workspace } = await requireLocalContext();
+
   const repositoryId = parsed.repositoryId || null;
   const body = parsed.body.trim();
   const title = parsed.title?.trim() || titleFromBody(body);
@@ -54,6 +63,19 @@ export async function createWorkItem(formData: FormData) {
   }
 
   redirect("/repositories");
+}
+
+function workItemFormDataToInput(formData: FormData) {
+  return {
+    repositoryId: formData.get("repositoryId") || "",
+    type: formData.get("type"),
+    title: formData.get("title"),
+    body: formData.get("body") ?? "",
+    priority: formData.get("priority") || "p2",
+    privacyLevel: formData.get("privacyLevel") || "normal",
+    isPinned: formData.get("isPinned") === "on",
+    externalUrl: formData.get("externalUrl") || undefined
+  };
 }
 
 export async function updateWorkItemStatus(formData: FormData) {
