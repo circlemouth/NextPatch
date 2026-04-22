@@ -2,18 +2,6 @@ import { logoutAction } from "@/server/auth/actions";
 import { requireLocalContextForPage } from "@/server/auth/session";
 import Link from "next/link";
 
-const navItems = [
-  ["Dashboard", "/dashboard"],
-  ["Repositories", "/repositories"],
-  ["Work Items", "/work-items"],
-  ["Inbox", "/inbox"],
-  ["Capture", "/capture/new"],
-  ["Ideas", "/ideas"],
-  ["Tech Notes", "/tech-notes"],
-  ["References", "/references"],
-  ["Settings", "/settings"]
-] as const;
-
 export const dynamic = "force-dynamic";
 
 export default async function AppLayout({
@@ -25,36 +13,35 @@ export default async function AppLayout({
 
   return (
     <div className="app-shell">
-      <div className="app-frame">
-        <aside className="sidebar" aria-label="Primary navigation">
-          <h1 className="sidebar__brand">NextPatch</h1>
-          <nav>
-            {navItems.map(([label, href]) => (
-              <Link className="nav-link" href={href} key={href}>
-                {label}
+      <div className="main-area">
+        <header className="topbar">
+          <div className="topbar__brand-block">
+            <Link className="topbar__brand" href="/repositories">
+              NextPatch
+            </Link>
+            <p className="support">ログイン中: {workspace.name}</p>
+          </div>
+          <details className="topbar-menu">
+            <summary className="button button--secondary topbar-menu__summary">メニュー</summary>
+            <div className="topbar-menu__panel" role="menu" aria-label="Topbar menu">
+              <Link className="topbar-menu__item" href="/settings" role="menuitem">
+                設定
               </Link>
-            ))}
-          </nav>
-        </aside>
-        <div className="main-area">
-          <header className="topbar">
-            <div>
-              <strong>LAN内運用</strong>
-              <p className="support">ログイン中: {workspace.name}</p>
-            </div>
-            <div className="button-row">
-              <Link className="button" href="/capture/new">
-                Quick Capture
+              <Link className="topbar-menu__item" href="/settings/data" role="menuitem">
+                データ管理
+              </Link>
+              <Link className="topbar-menu__item" href="/settings/system" role="menuitem">
+                システム状態
               </Link>
               <form action={logoutAction}>
-                <button className="button button--secondary" type="submit">
+                <button className="topbar-menu__item topbar-menu__action" type="submit">
                   ログアウト
                 </button>
               </form>
             </div>
-          </header>
-          {children}
-        </div>
+          </details>
+        </header>
+        {children}
       </div>
     </div>
   );

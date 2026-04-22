@@ -27,7 +27,7 @@ type LoginPageProps = {
 
 export default async function LoginPage({ searchParams }: LoginPageProps) {
   if (await getAuthenticatedLocalContext()) {
-    redirect("/dashboard");
+    redirect("/repositories");
   }
 
   const params = await searchParams;

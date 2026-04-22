@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { hasAuthenticatedLocalSession } from "@/server/auth/proxy-session";
-import { getLoginPath, isProtectedPath, isPublicPath, sanitizeNextPath } from "@/server/auth/redirects";
+import { DEFAULT_AUTH_REDIRECT_PATH, getLoginPath, isProtectedPath, isPublicPath, sanitizeNextPath } from "@/server/auth/redirects";
 
 export async function proxy(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
@@ -8,7 +8,7 @@ export async function proxy(request: NextRequest) {
 
   if (pathname === "/login") {
     if (authenticated) {
-      return NextResponse.redirect(new URL("/dashboard", request.url), 303);
+      return NextResponse.redirect(new URL(DEFAULT_AUTH_REDIRECT_PATH, request.url), 303);
     }
 
     return NextResponse.next();

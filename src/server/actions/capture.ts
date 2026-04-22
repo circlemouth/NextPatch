@@ -42,9 +42,14 @@ export async function quickCapture(formData: FormData) {
     importResult
   });
 
-  revalidatePath("/dashboard");
+  revalidatePath("/repositories");
   revalidatePath("/inbox");
-  redirect(type === "memo" ? "/inbox" : "/work-items");
+  if (repositoryId) {
+    revalidatePath(`/repositories/${repositoryId}`);
+    redirect(`/repositories/${repositoryId}`);
+  }
+
+  redirect("/repositories");
 }
 
 function firstLine(value: string) {

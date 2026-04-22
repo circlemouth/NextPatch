@@ -14,7 +14,7 @@ export const repositorySchema = z.object({
 export const workItemSchema = z.object({
   repositoryId: z.string().uuid().optional().or(z.literal("")),
   type: z.enum(["task", "bug", "idea", "implementation", "future_feature", "memo"]),
-  title: z.string().trim().min(1, "＊タイトルを入力してください。"),
+  title: z.string().trim().optional(),
   body: z.string().trim().optional(),
   priority: z.enum(["p0", "p1", "p2", "p3", "p4"]).default("p2"),
   privacyLevel: z.enum(["normal", "confidential", "secret", "no_ai"]).default("normal"),

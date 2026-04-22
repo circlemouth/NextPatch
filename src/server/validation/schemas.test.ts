@@ -21,6 +21,12 @@ describe("workItemSchema", () => {
     expect(result.privacyLevel).toBe("normal");
   });
 
+  it("accepts missing titles for body-derived creation flows", () => {
+    const result = workItemSchema.parse({ type: "memo", body: "First line" });
+    expect(result.title).toBeUndefined();
+    expect(result.body).toBe("First line");
+  });
+
   it("rejects invalid privacy levels", () => {
     expect(() =>
       workItemSchema.parse({
