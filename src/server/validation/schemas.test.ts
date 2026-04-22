@@ -40,6 +40,14 @@ describe("quickCaptureSchema", () => {
   });
 });
 
+describe("titleFromBody", () => {
+  it("derives a title from the first non-empty line", () => {
+    expect(titleFromBody("Investigate repo-specific issue\nFollow up later")).toBe("Investigate repo-specific issue");
+    expect(titleFromBody("   \n  Follow up later")).toBe("Follow up later");
+    expect(titleFromBody("   ")).toBe("Untitled memo");
+  });
+});
+
 describe("classifyMemoSchema", () => {
   it("validates memo classification payloads", () => {
     const result = classifyMemoSchema.parse({
@@ -64,3 +72,11 @@ describe("classifyMemoSchema", () => {
     ).toThrow();
   });
 });
+
+function titleFromBody(value: string) {
+  return value
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .find(Boolean)
+    ?.slice(0, 80) || "Untitled memo";
+}
