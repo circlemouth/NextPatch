@@ -30,7 +30,7 @@ test("SQLite local smoke: repositories-first flows, quick write, menu settings, 
   await page.getByLabel(/ログインパスワード/).fill("e2e-password");
   await page.getByRole("button", { name: "ログイン" }).click();
   await expect(page).toHaveURL(/\/repositories$/);
-  await expect(page.getByRole("heading", { name: "リポジトリ" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "リポジトリ", exact: true })).toBeVisible();
   await assertNoExternalAuthPrompts(page);
   await guards.assertHealthy("authenticated repositories");
 
@@ -45,7 +45,7 @@ test("SQLite local smoke: repositories-first flows, quick write, menu settings, 
   await expect(page.getByText(`Initial focus ${suffix}`)).toBeVisible();
   await guards.assertHealthy("repository create");
 
-  await page.getByLabel(/現在の焦点/).fill(`Updated focus ${suffix}`);
+  await page.getByRole("textbox", { name: /現在の焦点/ }).fill(`Updated focus ${suffix}`);
   await page.getByRole("button", { name: "保存" }).first().click();
   await expect(page).toHaveURL(/\/repositories\/[^/]+$/);
   await expect(page.getByText(`Updated focus ${suffix}`)).toBeVisible();
@@ -67,7 +67,7 @@ test("SQLite local smoke: repositories-first flows, quick write, menu settings, 
   await guards.assertHealthy("task status update");
 
   await openTopbarMenu(page);
-  await page.getByRole("link", { name: "データ管理" }).click();
+  await page.getByRole("menuitem", { name: "データ管理" }).click();
   await expect(page).toHaveURL(/\/settings\/data$/);
   await expect(page.getByRole("link", { name: "JSON export" })).toHaveAttribute("href", "/api/export/json");
   await expect(page.getByRole("link", { name: "Markdown export" })).toHaveAttribute("href", "/api/export/markdown");
@@ -128,7 +128,7 @@ async function gotoAndAssertHealthy(page: Page, guards: ReturnType<typeof instal
 }
 
 async function openTopbarMenu(page: Page) {
-  await page.getByRole("button", { name: /メニュー|設定/ }).click();
+  await page.locator("summary").filter({ hasText: /メニュー|設定/ }).click();
 }
 
 async function assertExportRouteOk(page: Page, route: string) {

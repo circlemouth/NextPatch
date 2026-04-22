@@ -2,34 +2,36 @@
 
 ## Summary
 
-This worktree updates the documentation and test expectations for the repo-centric UI refactor. It does not change the application source implementation here; instead it aligns README / AGENTS / tests / report artifacts with the `/repositories`-first target state.
+NextPatch のトップレベル UI を repository-centric に統合した。左メニューを削除し、`/repositories` をホーム、`/repositories/[repositoryId]` を中心作業画面にした。設定系は右上メニューへ移動し、旧トップレベル画面は `/repositories` redirect にした。
 
-## File changes
+## Major Changes
 
-| File | Change |
+| Area | Change |
 |---|---|
-| `README.md` | Updated login and product description to point at `/repositories` as the default home. |
-| `AGENTS.md` | Updated login guidance to use `/repositories` as the post-login default route. |
-| `src/server/auth/redirects.test.ts` | Updated redirect expectations for `/repositories` fallback. |
-| `src/server/db/queries.test.ts` | Added repository focus and repository summary coverage. |
-| `src/server/validation/schemas.test.ts` | Added title-from-body fallback coverage for quick write flows. |
-| `tests/e2e/sqlite-smoke.spec.ts` | Reworked the smoke flow around `/repositories`, the detail page, and the top-right menu. |
-| `docs/repo-centric-ui-refactor/final-report.md` | Captures the worktree-level summary. |
-| `docs/repo-centric-ui-refactor/test-results.md` | Captures command results and failures. |
-| `docs/repo-centric-ui-refactor/final-diff-summary.md` | This summary. |
-| `docs/repo-centric-ui-refactor/tests-docs-agent-report.md` | Task-specific report requested by the user. |
+| App shell | Sidebar/nav items を削除し、topbar brand link + settings menu に変更 |
+| Routing | `/`、ログイン fallback、認証済み `/login` を `/repositories` に統一 |
+| Legacy pages | Dashboard / Work Items / Inbox / Capture / Ideas / Tech Notes / References を `/repositories` redirect に変更 |
+| Repository home | リポジトリ一覧に GitHub full name、現在の焦点、未完了件数、メモ件数、最終更新を表示 |
+| Repository detail | 「現在の焦点」と「すぐ書く」を追加し、保存後も詳細画面に戻る |
+| Server actions | repositoryId ありの作成/quick capture は repository detail に戻す |
+| Queries | `listRepositorySummaries` と `updateRepositoryFocusCommand` を追加 |
+| Tests | auth redirect、repository summary、validation、E2E を repo-centric UI に更新 |
+| E2E server | Windows で Playwright webServer が `pnpm` を起動できるよう修正 |
+| Docs | README / AGENTS / refactor reports を更新 |
 
-## Behavior changes
+## Acceptance Notes
 
-- The test suite now expects `/repositories` to be the default authenticated landing page.
-- The smoke test now validates repository creation, current focus edits, quick write save/return behavior, and the settings menu.
-- Validation coverage now documents the title fallback rule derived from the body text.
+- `src/app/(app)/layout.tsx` に `sidebar` / `navItems` はない。
+- `src/app/globals.css` に sidebar/mobile-menu/bottom-nav の復活はない。
+- `src/app/page.tsx` は `/repositories` redirect。
+- `src/server/auth/redirects.ts` の fallback は `/repositories`。
+- `/repositories/[repositoryId]` は「現在の焦点」と「すぐ書く」を持つ。
+- 主要 UI は「メモ・タスク」表記に寄せ、`WorkItem` 表記は残していない。
+- 右上メニューから settings/data/system/logout に到達できる。
 
-## Compatibility routes
+## Test Summary
 
-- `/dashboard`, `/work-items`, `/inbox`, `/capture/new`, `/ideas`, `/tech-notes`, and `/references` remain implementation concerns for the other worktree; this worktree only updates the test/doc expectations.
-
-## Notes
-
-- `pnpm test` still fails in this worktree because the source implementation has not yet been updated to the repo-centric behavior and one migration test is already failing.
-- `pnpm test:e2e` still needs a webServer PATH fix for `pnpm`.
+- `pnpm lint`: pass
+- `pnpm typecheck`: pass
+- `pnpm test`: pass
+- `pnpm test:e2e`: pass

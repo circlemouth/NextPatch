@@ -26,8 +26,10 @@ try {
   throw error;
 }
 
-const child = spawn("pnpm", ["exec", "next", "dev", "--hostname", "0.0.0.0"], {
+const pnpmCommand = process.platform === "win32" ? "pnpm.cmd" : "pnpm";
+const child = spawn(pnpmCommand, ["exec", "next", "dev", "--hostname", "0.0.0.0"], {
   env: process.env,
+  shell: process.platform === "win32",
   stdio: "inherit"
 });
 
